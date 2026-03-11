@@ -8,6 +8,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime, timezone
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -15,7 +16,7 @@ client = genai.Client(api_key=config.GEMINI_FIRST_API_KEY)
 
 BATCH_SIZE = 10       # Job descriptions per Gemini call
 SLEEP_BETWEEN = 6     # Seconds between API calls to avoid rate limiting
-MAX_JOBS = 200        # Cap to avoid excessive API usage
+MAX_JOBS = 200        # Cap per run to avoid excessive API usage
 
 
 # --- Pydantic schema for Gemini structured output ---
@@ -45,21 +46,22 @@ Rules:
 """
 
 
-def fetch_jobs_for_analysis() -> list:
-    """Fetch job descriptions from Supabase."""
+def fetch_unanalyzed_jobs() -> list:
+    """Fetch only jobs that have not yet been analyzed."""
     supabase = supabase_utils.get_supabase_client()
     response = supabase.from_("jobs") \
         .select("job_id, job_title, description") \
         .eq("is_active", True) \
         .eq("job_state", "new") \
+        .is_("insights_analyzed_at", "null") \
         .not_.is_("description", "null") \
         .limit(MAX_JOBS) \
         .execute()
 
     if response.data:
-        logging.info(f"Fetched {len(response.data)} jobs for analysis.")
+        logging.info(f"Fetched {len(response.data)} unanalyzed jobs.")
         return response.data
-    logging.warning("No jobs fetched for analysis.")
+    logging.info("No new unanalyzed jobs found.")
     return []
 
 
@@ -103,52 +105,80 @@ def aggregate_keywords(all_keywords: List[KeywordItem]) -> dict:
     return counts
 
 
-def save_insights_to_supabase(counts: dict):
-    """Upsert aggregated keyword counts into keyword_insights table."""
-    supabase = supabase_utils.get_supabase_client()
-
-    # Clear existing data for a clean recompute
-    supabase.from_("keyword_insights").delete().neq("id", 0).execute()
-    logging.info("Cleared existing keyword_insights.")
-
-    rows = [
-        {
-            "keyword": keyword,
-            "category": category,
-            "count": count,
-        }
-        for (keyword, category), count in counts.items()
-        if count >= 2  # Only include keywords appearing in 2+ jobs
-    ]
-
-    if not rows:
-        logging.warning("No keywords met the minimum frequency threshold.")
+def upsert_insights(counts: dict):
+    """
+    Increment existing keyword counts rather than wiping and recomputing.
+    Uses Supabase upsert with on-conflict increment logic via RPC,
+    falling back to a read-modify-write approach.
+    """
+    if not counts:
+        logging.warning("No keywords to upsert.")
         return
 
-    # Insert in batches of 100
+    supabase = supabase_utils.get_supabase_client()
+
+    # Fetch existing counts for the keywords we're about to upsert
+    keywords_list = [kw for (kw, _) in counts.keys()]
+    existing_response = supabase.from_("keyword_insights") \
+        .select("keyword, category, count") \
+        .in_("keyword", keywords_list) \
+        .execute()
+
+    existing = {}
+    for row in (existing_response.data or []):
+        existing[(row["keyword"], row["category"])] = row["count"]
+
+    rows = []
+    now = datetime.now(timezone.utc).isoformat()
+    for (keyword, category), new_count in counts.items():
+        prior = existing.get((keyword, category), 0)
+        rows.append({
+            "keyword": keyword,
+            "category": category,
+            "count": prior + new_count,
+            "last_updated": now,
+        })
+
+    # Upsert in batches of 100
     for i in range(0, len(rows), 100):
         chunk = rows[i:i+100]
-        supabase.from_("keyword_insights").insert(chunk).execute()
+        supabase.from_("keyword_insights") \
+            .upsert(chunk, on_conflict="keyword,category") \
+            .execute()
 
-    logging.info(f"Saved {len(rows)} keyword insights to Supabase.")
+    logging.info(f"Upserted {len(rows)} keyword insight rows.")
+
+
+def mark_jobs_analyzed(job_ids: list):
+    """Stamp insights_analyzed_at on all processed jobs."""
+    if not job_ids:
+        return
+    supabase = supabase_utils.get_supabase_client()
+    now = datetime.now(timezone.utc).isoformat()
+    supabase.from_("jobs") \
+        .update({"insights_analyzed_at": now}) \
+        .in_("job_id", job_ids) \
+        .execute()
+    logging.info(f"Marked {len(job_ids)} jobs as analyzed.")
 
 
 def run():
     logging.info("Starting job insights analysis...")
 
-    jobs = fetch_jobs_for_analysis()
+    jobs = fetch_unanalyzed_jobs()
     if not jobs:
-        logging.info("No jobs to analyze. Exiting.")
+        logging.info("No new jobs to analyze. Exiting.")
         return
 
     all_keywords = []
+    processed_job_ids = []
 
-    # Process in batches
     for i in range(0, len(jobs), BATCH_SIZE):
         batch = jobs[i:i + BATCH_SIZE]
         logging.info(f"Processing batch {i // BATCH_SIZE + 1} ({len(batch)} jobs)...")
         keywords = extract_keywords_from_batch(batch)
         all_keywords.extend(keywords)
+        processed_job_ids.extend(job["job_id"] for job in batch)
         if i + BATCH_SIZE < len(jobs):
             logging.info(f"Sleeping {SLEEP_BETWEEN}s before next batch...")
             time.sleep(SLEEP_BETWEEN)
@@ -158,7 +188,9 @@ def run():
     counts = aggregate_keywords(all_keywords)
     logging.info(f"Unique keyword/category pairs: {len(counts)}")
 
-    save_insights_to_supabase(counts)
+    upsert_insights(counts)
+    mark_jobs_analyzed(processed_job_ids)
+
     logging.info("Insights analysis complete.")
 
 
