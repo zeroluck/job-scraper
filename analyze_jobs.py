@@ -48,13 +48,12 @@ Rules:
 
 def fetch_unanalyzed_jobs() -> list:
     """Fetch only jobs that have not yet been analyzed."""
-    supabase = supabase_utils.get_supabase_client()
-    response = supabase.from_("jobs") \
+    response = supabase_utils.supabase.table(config.SUPABASE_TABLE_NAME) \
         .select("job_id, job_title, description") \
         .eq("is_active", True) \
         .eq("job_state", "new") \
-        .is_("insights_analyzed_at", "null") \
-        .not_.is_("description", "null") \
+        .is_("insights_analyzed_at", None) \
+        .not_.is_("description", None) \
         .limit(MAX_JOBS) \
         .execute()
 
@@ -108,18 +107,16 @@ def aggregate_keywords(all_keywords: List[KeywordItem]) -> dict:
 def upsert_insights(counts: dict):
     """
     Increment existing keyword counts rather than wiping and recomputing.
-    Uses Supabase upsert with on-conflict increment logic via RPC,
-    falling back to a read-modify-write approach.
     """
     if not counts:
         logging.warning("No keywords to upsert.")
         return
 
-    supabase = supabase_utils.get_supabase_client()
+    db = supabase_utils.supabase
 
     # Fetch existing counts for the keywords we're about to upsert
     keywords_list = [kw for (kw, _) in counts.keys()]
-    existing_response = supabase.from_("keyword_insights") \
+    existing_response = db.table("keyword_insights") \
         .select("keyword, category, count") \
         .in_("keyword", keywords_list) \
         .execute()
@@ -142,7 +139,7 @@ def upsert_insights(counts: dict):
     # Upsert in batches of 100
     for i in range(0, len(rows), 100):
         chunk = rows[i:i+100]
-        supabase.from_("keyword_insights") \
+        db.table("keyword_insights") \
             .upsert(chunk, on_conflict="keyword,category") \
             .execute()
 
@@ -153,9 +150,8 @@ def mark_jobs_analyzed(job_ids: list):
     """Stamp insights_analyzed_at on all processed jobs."""
     if not job_ids:
         return
-    supabase = supabase_utils.get_supabase_client()
     now = datetime.now(timezone.utc).isoformat()
-    supabase.from_("jobs") \
+    supabase_utils.supabase.table(config.SUPABASE_TABLE_NAME) \
         .update({"insights_analyzed_at": now}) \
         .in_("job_id", job_ids) \
         .execute()
