@@ -64,8 +64,8 @@ def fetch_unanalyzed_jobs() -> list:
     return []
 
 
-def extract_keywords_from_batch(batch: list) -> List[KeywordItem]:
-    """Send a batch of job descriptions to Gemini and extract keywords."""
+def extract_keywords_from_batch(batch: list, max_retries: int = 3) -> List[KeywordItem]:
+    """Send a batch of job descriptions to Gemini and extract keywords, with exponential backoff retry."""
     combined = ""
     for i, job in enumerate(batch):
         combined += f"\n\n--- JOB {i+1}: {job.get('job_title', 'Unknown')} ---\n{job.get('description', '')}"
@@ -76,23 +76,29 @@ Extract all requested skills, technologies, certifications, and candidate attrib
 {combined}
 """
 
-    try:
-        response = client.models.generate_content(
-            model=config.GEMINI_MODEL_NAME,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                system_instruction=SYSTEM_PROMPT,
-                response_mime_type='application/json',
-                response_schema=KeywordList,
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=config.GEMINI_MODEL_NAME,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                    system_instruction=SYSTEM_PROMPT,
+                    response_mime_type='application/json',
+                    response_schema=KeywordList,
+                )
             )
-        )
-        parsed = KeywordList.model_validate_json(response.text.strip())
-        logging.info(f"Extracted {len(parsed.keywords)} keywords from batch of {len(batch)}")
-        return parsed.keywords
-    except Exception as e:
-        logging.error(f"Error extracting keywords from batch: {e}")
-        return []
+            parsed = KeywordList.model_validate_json(response.text.strip())
+            logging.info(f"Extracted {len(parsed.keywords)} keywords from batch of {len(batch)}")
+            return parsed.keywords
+        except Exception as e:
+            wait = SLEEP_BETWEEN * (2 ** (attempt - 1))  # 6s, 12s, 24s
+            if attempt < max_retries:
+                logging.warning(f"Attempt {attempt}/{max_retries} failed: {e}. Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                logging.error(f"All {max_retries} attempts failed for batch. Skipping. Last error: {e}")
+    return []
 
 
 def aggregate_keywords(all_keywords: List[KeywordItem]) -> dict:
@@ -182,8 +188,11 @@ def run():
         batch = jobs[i:i + BATCH_SIZE]
         logging.info(f"Processing batch {i // BATCH_SIZE + 1} ({len(batch)} jobs)...")
         keywords = extract_keywords_from_batch(batch)
-        all_keywords.extend(keywords)
-        processed_job_ids.extend(job["job_id"] for job in batch)
+        if keywords:
+            all_keywords.extend(keywords)
+            processed_job_ids.extend(job["job_id"] for job in batch)
+        else:
+            logging.warning(f"Batch {i // BATCH_SIZE + 1} yielded no keywords — jobs will not be marked as analyzed.")
         if i + BATCH_SIZE < len(jobs):
             logging.info(f"Sleeping {SLEEP_BETWEEN}s before next batch...")
             time.sleep(SLEEP_BETWEEN)
