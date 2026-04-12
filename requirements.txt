@@ -6,6 +6,5 @@ httpx
 pdfplumber
 google-genai
 pydantic
-playwright
 html2text
-reportlab
+rendercv[full]

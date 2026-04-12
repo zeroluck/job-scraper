@@ -5,7 +5,7 @@ import config
 from pydantic import BaseModel, Field, ValidationError
 from typing import List, Optional, Dict, Any
 import json
-import pdf_generator
+import rendercv_generator
 import re
 import asyncio
 from google import genai
@@ -492,7 +492,7 @@ async def process_job(job_details: Dict[str, Any], base_resume_details: Resume):
         # Generate PDF
         logging.info(f"Generating PDF for job_id: {job_id}")
         try:
-            pdf_bytes = pdf_generator.create_resume_pdf(budget_trimmed_resume)
+            pdf_bytes = rendercv_generator.create_resume_pdf(budget_trimmed_resume)
             if not pdf_bytes:
                 raise ValueError("PDF generation returned empty bytes.")
             logging.info(f"PDF generation complete for job_id: {job_id}")

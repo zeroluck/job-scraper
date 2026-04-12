@@ -15,21 +15,20 @@ This project is a comprehensive suite of tools designed to automate and enhance 
   - Periodically checks if active jobs are still available.
     ([job_manager.py](job_manager.py))
 - **Data Storage**: Uses Supabase to store job data, resume details, and application statuses. (Utility functions in [supabase_utils.py](supabase_utils.py))
-- **Custom PDF Resume Generation**: Generates ATS-friendly PDF resumes from structured resume data. ([pdf_generator.py](pdf_generator.py))
+- **Custom PDF Resume Generation**: Generates ATS-friendly PDF resumes using RenderCV (YAML → Typst → PDF). ([rendercv_generator.py](rendercv_generator.py))
 - **AI-Powered Text Processing**: Leverages Google Gemini for tasks like resume parsing and converting job descriptions to Markdown.
 - **Automated Workflows**: Includes GitHub Actions for running tasks like job scraping, scoring, and management on a schedule. ([workflows](.github/workflows/))
 
 ## Tech Stack
 
-- **Programming Language**: Python 3.11.9
+- **Programming Language**: Python 3.12+
 - **Web Scraping/HTTP**:
   - `requests`
   - `httpx`
   - `BeautifulSoup4` (for HTML parsing)
-  - `Playwright` (for browser automation)
 - **PDF Processing**:
   - `pdfplumber` (for text extraction)
-  - `ReportLab` (for PDF generation)
+  - `rendercv[full]` (for PDF generation via Typst)
 - **AI/LLM**: `google-genai` (Google Gemini API)
 - **Database**: Supabase (`supabase`)
 - **Data Validation**: `Pydantic`
@@ -140,7 +139,7 @@ The individual Python scripts can still be run locally for development or testin
 3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
-    playwright install # Install browser drivers for Playwright
+
     ```
 4.  **Create a `.env` file:**
     *   In the root of your local repository, create a `.env` file.
@@ -178,7 +177,7 @@ The individual Python scripts can still be run locally for development or testin
 ├── job_manager.py              # Manages job statuses (e.g., checks for active jobs, expires old ones)
 ├── models.py                   # Pydantic models for data validation
 ├── parse_resume_with_ai.py     # AI-powered resume parsing logic
-├── pdf_generator.py            # Generates PDF resumes
+├── rendercv_generator.py       # Generates PDF resumes via RenderCV
 ├── requirements.txt            # Python dependencies
 ├── resume_files/               # Folder to store your resume.pdf
 ├── resume_parser.py            # Main script to parse local resume PDF
@@ -212,8 +211,7 @@ This project is licensed under the MIT License. See the `LICENSE` file for more 
 
 *   This project utilizes the powerful [Google Gemini API](https://ai.google.dev/models/gemini) for AI-driven text processing.
 *   Data storage is managed with [Supabase](https://supabase.com/), an excellent open-source Firebase alternative.
-*   Web scraping capabilities are enhanced by [Playwright](https://playwright.dev/) and [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/).
-*   PDF generation is handled by [ReportLab](https://www.reportlab.com/).
+*   PDF generation is handled by [RenderCV](https://github.com/rendercv/rendercv), which uses Typst for typesetting.
 *   PDF text extraction is performed using [pdfplumber](https://github.com/jsvine/pdfplumber).
 
 ## Disclaimer
