@@ -7,4 +7,5 @@ pdfplumber
 google-genai
 pydantic
 html2text
+PyYAML
 rendercv[full]
