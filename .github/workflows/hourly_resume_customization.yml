@@ -31,11 +31,18 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          JOB_ID=$(curl -s -X GET "${SUPABASE_URL}/rest/v1/jobs?select=id&is_active=eq.true&not.customized_resume_id=is.null&limit=1" \
+          JOB_ID=$(curl -s -X GET "${SUPABASE_URL}/rest/v1/jobs?select=id&is_active=eq.true&customized_resume_id=not.is.null&limit=1" \
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0]['id'] if data else '')")
+            -H "Prefer: return=representation" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data[0]['id'] if data else '')
+except:
+    print('')
+")
           if [ -n "$JOB_ID" ]; then
             echo "Clearing customized_resume_id for job: $JOB_ID"
             curl -s -X PATCH "${SUPABASE_URL}/rest/v1/jobs?id=eq.${JOB_ID}" \
@@ -44,9 +51,11 @@ jobs:
               -H "Content-Type: application/json" \
               -H "Prefer: return=representation" \
               -d '{"customized_resume_id": null, "resume_score_stage": "initial"}'
+            echo "Cleared. Job $JOB_ID will be re-processed."
           else
             echo "No eligible jobs found to clear. Proceeding anyway."
           fi
+        continue-on-error: true
 
       - name: Run resume customization script
         env:
@@ -62,10 +71,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          sleep 5
-          LINK=$(curl -s -X GET "${SUPABASE_URL}/rest/v1/customized_resumes?select=resume_link&order=created_at.desc&limit=1" \
+          LINK=$(curl -s -X GET "${SUPABASE_URL}/rest/v1/customized_resumes?select=resume_link,created_at&order=created_at.desc&limit=1" \
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0]['resume_link'] if data else 'No link found')")
+            -H "Prefer: return=representation" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data[0]['resume_link'] if data else 'No link found')
+except:
+    print('No link found')
+")
           echo "::notice::Latest resume PDF: ${LINK}"
