@@ -19,27 +19,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          sudo apt-get install -y jq
 
       - name: Clear existing resume for test
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          JOB_ID=$(curl -s -X GET "${SUPABASE_URL}/rest/v1/jobs?select=id&is_active=eq.true&customized_resume_id=not.is.null&limit=1" \
+          JOB_ID=$(curl -s -X GET "${SUPABASE_URL}/rest/v1/jobs?select=job_id&is_active=eq.true&customized_resume_id=not.is.null&limit=1" \
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data[0]['id'] if data else '')
-except:
-    print('')
-")
+            -H "Prefer: return=representation" | jq -r '.[0].job_id // empty')
           if [ -n "$JOB_ID" ]; then
             echo "Clearing customized_resume_id for job: $JOB_ID"
-            curl -s -X PATCH "${SUPABASE_URL}/rest/v1/jobs?id=eq.${JOB_ID}" \
+            curl -s -X PATCH "${SUPABASE_URL}/rest/v1/jobs?job_id=eq.${JOB_ID}" \
               -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
               -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
               -H "Content-Type: application/json" \
@@ -69,12 +63,5 @@ except:
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data[0]['resume_link'] if data else 'No link found')
-except:
-    print('No link found')
-")
+            -H "Prefer: return=representation" | jq -r '.[0].resume_link // "No link found"')
           echo "::notice::Latest resume PDF: ${LINK}"
