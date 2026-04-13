@@ -80,7 +80,10 @@ def _build_rendercv_yaml(resume: Resume) -> dict:
     if resume.email:
         cv["email"] = resume.email
     if resume.phone:
-        cv["phone"] = resume.phone
+        phone = str(resume.phone).strip()
+        if not phone.startswith('+'):
+            phone = f"+1 {phone}"
+        cv["phone"] = phone
     if resume.location:
         cv["location"] = resume.location
 
@@ -238,8 +241,9 @@ def create_resume_pdf(resume: Resume) -> bytes:
         )
 
         if result.returncode != 0:
+            logging.error("RenderCV output: %s", result.stdout)
             logging.error("RenderCV stderr: %s", result.stderr)
-            raise RuntimeError(f"RenderCV failed: {result.stderr}")
+            raise RuntimeError(f"RenderCV failed: {result.stdout}\n{result.stderr}")
 
         pdf_path = yaml_path.with_suffix(".pdf")
         if not pdf_path.exists():
