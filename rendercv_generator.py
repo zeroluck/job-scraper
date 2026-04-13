@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import subprocess
 import tempfile
@@ -11,8 +10,6 @@ import yaml
 from models import Resume
 
 logging.basicConfig(level=logging.INFO)
-
-ACCENT_COLOR = "#1976D2"
 
 
 def _parse_date(raw: Optional[str]) -> Optional[str]:
@@ -202,17 +199,6 @@ def _build_rendercv_yaml(resume: Resume) -> dict:
             "bottom_margin": "0.6in",
             "left_margin": "0.6in",
             "right_margin": "0.6in",
-        },
-        "colors": {
-            "name": ACCENT_COLOR,
-            "headline": ACCENT_COLOR,
-            "section_titles": ACCENT_COLOR,
-            "links": ACCENT_COLOR,
-            "connections": ACCENT_COLOR,
-        },
-        "typography": {
-            "font_family": "Source Sans 3",
-            "alignment": "justified",
         },
     }
 
