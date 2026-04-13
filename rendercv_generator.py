@@ -228,13 +228,23 @@ def create_resume_pdf(resume: Resume) -> bytes:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         yaml_path = Path(tmpdir) / "resume_CV.yaml"
+        pdf_path = Path(tmpdir) / "output.pdf"
         with open(yaml_path, "w") as f:
             yaml.dump(rendercv_yaml, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
         logging.info("RenderCV YAML written to %s", yaml_path)
 
         result = subprocess.run(
-            ["rendercv", "render", str(yaml_path)],
+            [
+                "rendercv", 
+                "render", 
+                str(yaml_path), 
+                "--pdf-path", 
+                str(pdf_path),
+                "--dont-generate-html",
+                "--dont-generate-markdown",
+                "--dont-generate-png"
+            ],
             capture_output=True,
             text=True,
             timeout=60,
@@ -245,7 +255,6 @@ def create_resume_pdf(resume: Resume) -> bytes:
             logging.error("RenderCV stderr: %s", result.stderr)
             raise RuntimeError(f"RenderCV failed: {result.stdout}\n{result.stderr}")
 
-        pdf_path = yaml_path.with_suffix(".pdf")
         if not pdf_path.exists():
             raise RuntimeError(f"RenderCV did not produce expected PDF at {pdf_path}")
 
