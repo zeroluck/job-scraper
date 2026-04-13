@@ -30,7 +30,7 @@ LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("GEMINI_API_KEY") 
 LLM_MODEL = "gemini"
 
 # --- Search Configuration ---
-LINKEDIN_SEARCH_QUERIES = [["IT Project Manager", "Technical Project Manager", "Information Technology Project Manager", "Technical Program Manager"]]
+LINKEDIN_SEARCH_QUERIES = ["IT Project Manager", "Technical Project Manager", "Information Technology Project Manager", "Technical Program Manager"]
 LINKEDIN_LOCATION = "Canada"
 LINKEDIN_GEO_ID = 101174742      # Canada
 LINKEDIN_JOB_TYPE = "F" # F=Full-time, C=Contract, P=Part-time, T=Temporary, I=Internship
