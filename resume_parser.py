@@ -62,7 +62,19 @@ def parse_resume_with_ai(resume_text):
     )
     return response_text
 
-def parse_and_validate_resume(resume_text, max_retries=3):
+def replace_empty_with_na(data):
+    """
+    Recursively replaces empty strings or None values in a dictionary or list with "NA".
+    """
+    if isinstance(data, dict):
+        return {k: replace_empty_with_na(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [replace_empty_with_na(i) for i in data]
+    elif data == "" or data is None:
+        return "NA"
+    return data
+
+def parse_and_validate_resume(resume_text, max_retries=config.MAX_RETRIES):
     """
     Attempts to parse resume text with AI, with retry logic for JSON errors or empty responses.
     
@@ -73,21 +85,12 @@ def parse_and_validate_resume(resume_text, max_retries=3):
     Returns:
         dict: The structured resume data with empty values replaced by "NA".
     """
-    def replace_empty_with_na(data):
-        if isinstance(data, dict):
-            return {k: replace_empty_with_na(v) for k, v in data.items()}
-        elif isinstance(data, list):
-            return [replace_empty_with_na(i) for i in data]
-        elif data == "" or data is None:
-            return "NA"
-        return data
-
     for attempt in range(max_retries):
         parsed_resume_details_str = parse_resume_with_ai(resume_text)
         
         if not parsed_resume_details_str:
             print(f"Attempt {attempt + 1}: Received empty response from AI. Retrying...")
-            time.sleep(2)
+            time.sleep(config.RETRY_DELAY_SECONDS)
             continue
             
         try:
@@ -95,7 +98,7 @@ def parse_and_validate_resume(resume_text, max_retries=3):
             return replace_empty_with_na(resume_data_dict)
         except json.JSONDecodeError as e:
             print(f"Attempt {attempt + 1}: JSON decode error: {e}. Retrying...")
-            time.sleep(2)
+            time.sleep(config.RETRY_DELAY_SECONDS)
             
     print(f"ERROR: Failed to parse resume after {max_retries} attempts.")
     sys.exit(1)
@@ -134,31 +137,7 @@ def main():
         return
 
     # 3. Parse resume text with AI
-    parsed_resume_details_str = parse_resume_with_ai(resume_text)
-    if not parsed_resume_details_str:
-        print("Failed to parse resume. Exiting.")
-        return
-
-    try:
-        # Convert the JSON string response to a dictionary
-        resume_data_dict = json.loads(parsed_resume_details_str)
-        
-        # Recursive function to replace empty values or None with "NA"
-        def replace_empty_with_na(data):
-            if isinstance(data, dict):
-                return {k: replace_empty_with_na(v) for k, v in data.items()}
-            elif isinstance(data, list):
-                return[replace_empty_with_na(i) for i in data]
-            elif data == "" or data is None:
-                return "NA"
-            return data
-
-        resume_data_dict = replace_empty_with_na(resume_data_dict)
-
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON response from AI: {e}")
-        print(f"Raw response: {parsed_resume_details_str}")
-        return
+    resume_data_dict = parse_and_validate_resume(resume_text)
 
     # 4. Save parsed data to Supabase base_resume table
     save_success = supabase_utils.save_base_resume(resume_data_dict)
