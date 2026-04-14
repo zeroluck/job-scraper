@@ -2,6 +2,8 @@ import pdfplumber
 import config
 import json
 import models
+import sys
+import time
 from llm_client import primary_client
 
 def extract_text_from_pdf(pdf_path):
@@ -59,6 +61,44 @@ def parse_resume_with_ai(resume_text):
         response_format=models.Resume,
     )
     return response_text
+
+def parse_and_validate_resume(resume_text, max_retries=3):
+    """
+    Attempts to parse resume text with AI, with retry logic for JSON errors or empty responses.
+    
+    Args:
+        resume_text (str): The extracted text from the resume.
+        max_retries (int): Maximum number of attempts.
+        
+    Returns:
+        dict: The structured resume data with empty values replaced by "NA".
+    """
+    def replace_empty_with_na(data):
+        if isinstance(data, dict):
+            return {k: replace_empty_with_na(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [replace_empty_with_na(i) for i in data]
+        elif data == "" or data is None:
+            return "NA"
+        return data
+
+    for attempt in range(max_retries):
+        parsed_resume_details_str = parse_resume_with_ai(resume_text)
+        
+        if not parsed_resume_details_str:
+            print(f"Attempt {attempt + 1}: Received empty response from AI. Retrying...")
+            time.sleep(2)
+            continue
+            
+        try:
+            resume_data_dict = json.loads(parsed_resume_details_str)
+            return replace_empty_with_na(resume_data_dict)
+        except json.JSONDecodeError as e:
+            print(f"Attempt {attempt + 1}: JSON decode error: {e}. Retrying...")
+            time.sleep(2)
+            
+    print(f"ERROR: Failed to parse resume after {max_retries} attempts.")
+    sys.exit(1)
 
 def main():
     """
