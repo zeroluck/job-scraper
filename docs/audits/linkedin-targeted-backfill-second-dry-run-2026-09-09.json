@@ -1,0 +1,13 @@
+{
+  "applied_count": 0,
+  "change_count": 0,
+  "changes": [],
+  "configuration_revision": 10,
+  "memberships_scanned": 8348,
+  "mode": "dry-run",
+  "target_archetypes": [
+    "ai_workflow_automation",
+    "technology_delivery"
+  ],
+  "transition_counts": {}
+}

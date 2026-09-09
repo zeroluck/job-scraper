@@ -189,7 +189,9 @@ def _career_lane_runtime_profile(lane, location: str) -> dict:
             *lane.title_exclude,
             *lane.description_exclude,
         ],
+        "company_blocklist": [],
         "title_blocklist": list(lane.title_exclude),
+        "title_entry_level_blocklist": [],
         "desc_blocklist": list(lane.description_exclude),
     })
     for key in ("company_blocklist", "title_blocklist", "title_entry_level_blocklist", "desc_blocklist"):

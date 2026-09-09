@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import supabase_utils
+import scraper
 import pytest
 
 
@@ -53,6 +54,23 @@ def test_lane_include_terms_are_or_routing_signals_and_excludes_win():
     assert included["filter_status"] == "included"
     assert review == {"filter_status": "review", "is_filtered": False, "filter_reason": "include:no_route_signal", "is_entry_level_filtered": False}
     assert excluded["filter_status"] == "filtered"
+
+
+def test_database_lane_profile_does_not_inherit_legacy_hidden_exclusions():
+    lane = SimpleNamespace(
+        archetype="technology_delivery",
+        description="Technology delivery",
+        routing_guidance="Own technology delivery.",
+        title_include=(r"technical program manager",),
+        title_exclude=(),
+        description_include=(),
+        description_exclude=(),
+    )
+
+    profile = scraper._career_lane_runtime_profile(lane, "Canada")
+
+    assert profile["company_blocklist"] == []
+    assert profile["title_entry_level_blocklist"] == []
 
 
 @pytest.mark.parametrize(("title", "pattern"), [

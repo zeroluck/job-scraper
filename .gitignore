@@ -3,6 +3,17 @@ __pycache__/
 .venv
 .worktrees/
 docs/
+!docs/
+docs/*
+!docs/audits/
+docs/audits/*
+!docs/audits/linkedin-targeted-relevance-audit-2026-09-09.md
+!docs/audits/linkedin-targeted-relevance-samples-2026-09-09.json
+!docs/audits/linkedin-targeted-filter-impact-2026-09-09.json
+!docs/audits/linkedin-targeted-backfill-dry-run-2026-09-09.json
+!docs/audits/linkedin-targeted-backfill-apply-2026-09-09.json
+!docs/audits/linkedin-targeted-backfill-second-dry-run-2026-09-09.json
+!docs/audits/linkedin-absolute-recall-investigation-2026-09-09.md
 .DS_Store
 
 # research artifacts, not part of the main project yet
