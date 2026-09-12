@@ -18,6 +18,7 @@ Usage:
 import os
 import time
 import random
+import re
 import logging
 import threading
 from typing import Optional, Any, Type
@@ -28,6 +29,14 @@ from pydantic import BaseModel
 import config
 
 logger = logging.getLogger(__name__)
+
+
+def _provider_retry_delay(error: Exception) -> float | None:
+    """Extract a bounded provider retry hint from common quota messages."""
+    match = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)s", str(error), re.IGNORECASE)
+    if not match:
+        return None
+    return min(60.0, max(0.0, float(match.group(1))))
 
 # Suppress litellm's verbose logging unless DEBUG is set
 litellm.suppress_debug_info = True
@@ -261,6 +270,9 @@ class LLMClient:
                     if use_model_pool:
                         pool_index += 1
                         delay = random.uniform(1, 4) # Short delay when switching models
+                        retry_delay = _provider_retry_delay(e)
+                        if retry_delay is not None:
+                            delay = max(delay, retry_delay)
                         logger.warning(
                             f"Rate limit hit for {current_model}. Switching to next pool model... "
                             f"(attempt {attempt + 1}/{max_attempts}). Retrying in {delay:.1f}s. Error: {e}"
