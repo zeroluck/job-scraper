@@ -80,13 +80,22 @@ def fetch_unanalyzed_jobs(
     if limit is None:
         limit = config.JOB_INSIGHTS_MAX_JOBS
     try:
-        membership_response = db.rpc("get_lane_jobs_for_analysis", {
-            "p_archetype": canonical_lane_slug(archetype),
-            "p_limit": limit,
-            "p_backfill_all": backfill_all,
-            "p_replacement_backfill": replacement_backfill,
-        }).execute()
-        return membership_response.data or []
+        for attempt in range(3):
+            try:
+                membership_response = db.rpc("get_lane_jobs_for_analysis", {
+                    "p_archetype": canonical_lane_slug(archetype),
+                    "p_limit": limit,
+                    "p_backfill_all": backfill_all,
+                    "p_replacement_backfill": replacement_backfill,
+                }).execute()
+                return membership_response.data or []
+            except Exception as exc:
+                if "57014" not in str(exc) or attempt == 2:
+                    raise
+                logger.warning(
+                    "Insight queue query timed out; retrying (%s/3).", attempt + 1
+                )
+                time.sleep(2 ** attempt)
     except AttributeError:
         pass
 

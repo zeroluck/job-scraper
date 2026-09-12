@@ -457,6 +457,26 @@ def test_extract_keywords_from_batch_defers_provider_quota_exhaustion(monkeypatc
     assert result == {}
 
 
+def test_fetch_unanalyzed_jobs_retries_statement_timeout(monkeypatch):
+    calls = []
+
+    class Request:
+        def execute(self):
+            calls.append("execute")
+            if len(calls) == 1:
+                raise RuntimeError("57014 canceling statement due to statement timeout")
+            return type("Response", (), {"data": [{"job_id": "1"}]})()
+
+    class Db:
+        def rpc(self, _name, _args):
+            return Request()
+
+    monkeypatch.setattr(analyze_jobs.time, "sleep", lambda _seconds: None)
+
+    assert analyze_jobs.fetch_unanalyzed_jobs(db=Db()) == [{"job_id": "1"}]
+    assert calls == ["execute", "execute"]
+
+
 def test_mark_jobs_analyzed_updates_timestamp_for_ids():
     calls = []
 
