@@ -87,6 +87,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           FREEHIRE_CLASSIFY_PAGE_SIZE: "500"
+          FREEHIRE_CLASSIFY_REQUEST_BUDGET: "10"
         run: python incremental_freehire_compat.py
 
   publication_gate:

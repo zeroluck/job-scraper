@@ -154,6 +154,7 @@ def test_hourly_pipeline_has_separate_strictly_dependent_jobs_and_drains_compati
 
     compat_step = jobs["freehire_compat"]["steps"][-1]
     assert compat_step["env"]["FREEHIRE_CLASSIFY_PAGE_SIZE"] == "500"
+    assert compat_step["env"]["FREEHIRE_CLASSIFY_REQUEST_BUDGET"] == "10"
     assert "FREEHIRE_CLASSIFY_LIMIT" not in compat_step["env"]
     assert compat_step["run"] == "python incremental_freehire_compat.py"
 
