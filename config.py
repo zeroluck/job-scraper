@@ -165,6 +165,12 @@ SCRAPING_SOURCES = ["linkedin"] # "linkedin", "careers_future"
 JOBS_TO_SCORE_PER_RUN = min(
     50, max(1, int(os.environ.get("JOBS_TO_SCORE_PER_RUN", "50")))
 )
+JOB_SCORE_BATCH_SIZE = min(
+    5, max(1, int(os.environ.get("JOB_SCORE_BATCH_SIZE", "5")))
+)
+JOB_SCORE_DESCRIPTION_MAX_CHARS = max(
+    1000, int(os.environ.get("JOB_SCORE_DESCRIPTION_MAX_CHARS", "8000"))
+)
 JOBS_TO_CUSTOMIZE_PER_RUN = 1
 MAX_JOBS_PER_SEARCH = {
     "linkedin": None,

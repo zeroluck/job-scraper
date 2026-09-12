@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 from types import SimpleNamespace
 
@@ -34,6 +35,138 @@ def test_get_resume_score_uses_job_scoring_client_without_reasoning(monkeypatch)
     assert calls[0]["reasoning_effort"] == "low"
     assert "temperature" not in calls[0]
     assert calls[0]["max_tokens"] == 16
+
+
+def test_batch_scoring_returns_only_requested_valid_jobs(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+
+    class FakeClient:
+        def generate_content(self, **kwargs):
+            assert kwargs["response_format"] is score_jobs.JobScoreResultList
+            assert kwargs["max_tokens"] == 1000
+            return json.dumps({"jobs": [
+                {"job_id": "job-1", "score": 87},
+                {"job_id": "unknown", "score": 10},
+            ]})
+
+    monkeypatch.setattr(score_jobs, "job_scoring_client", FakeClient())
+
+    assert score_jobs.get_resume_scores_from_ai("resume", [{
+        "job_id": "job-1",
+        "description": "Lead delivery",
+    }]) == {"job-1": 87}
+
+
+def test_batch_scoring_rejects_invalid_or_malformed_output(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+
+    class FakeClient:
+        def generate_content(self, **_kwargs):
+            return '{"jobs":[{"job_id":"job-1","score":101}]}'
+
+    monkeypatch.setattr(score_jobs, "job_scoring_client", FakeClient())
+    monkeypatch.setattr(score_jobs, "get_resume_score_from_ai", lambda *_args: None)
+
+    assert score_jobs.get_resume_scores_from_ai("resume", [{
+        "job_id": "job-1",
+        "description": "Lead delivery",
+    }]) == {}
+
+
+def test_batch_scoring_preserves_valid_items_and_recovers_missing(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    calls = []
+
+    class FakeClient:
+        def generate_content(self, **_kwargs):
+            calls.append("batch")
+            return json.dumps({"jobs": [
+                {"job_id": "job-1", "score": 87},
+                {"job_id": "job-2", "score": 101},
+            ]})
+
+    monkeypatch.setattr(score_jobs, "job_scoring_client", FakeClient())
+    monkeypatch.setattr(
+        score_jobs,
+        "get_resume_score_from_ai",
+        lambda _resume, job: 65 if job["job_id"] == "job-2" else None,
+    )
+
+    result = score_jobs.get_resume_scores_from_ai("resume", [
+        {"job_id": "job-1", "description": "One"},
+        {"job_id": "job-2", "description": "Two"},
+    ])
+
+    assert result == {"job-1": 87, "job-2": 65}
+    assert calls == ["batch", "batch"]
+
+
+def test_batch_fallback_bounds_description(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    fallback_lengths = []
+
+    class FakeClient:
+        def generate_content(self, **_kwargs):
+            return '{"jobs":[]}'
+
+    monkeypatch.setattr(score_jobs, "job_scoring_client", FakeClient())
+    monkeypatch.setattr(score_jobs.config, "JOB_SCORE_DESCRIPTION_MAX_CHARS", 10)
+    monkeypatch.setattr(
+        score_jobs,
+        "get_resume_score_from_ai",
+        lambda _resume, job: fallback_lengths.append(len(job["description"])) or 50,
+    )
+
+    result = score_jobs.get_resume_scores_from_ai("resume", [{
+        "job_id": "job-1",
+        "description": "x" * 100,
+    }])
+
+    assert result == {"job-1": 50}
+    assert fallback_lengths == [10]
+
+
+def test_main_batches_initial_scoring_and_completes_each_claim(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    monkeypatch.setattr(score_jobs, "supabase_utils", supabase_utils)
+    jobs = [
+        {"job_id": "job-1", "description": "One"},
+        {"job_id": "job-2", "description": "Two"},
+    ]
+    updates = []
+    releases = []
+    monkeypatch.setattr(score_jobs.supabase_utils, "get_archetype_base_resume", lambda _lane: {"name": "Jane", "base_resume_id": "base"})
+    monkeypatch.setattr(score_jobs.supabase_utils, "get_jobs_to_score", lambda *_args, **_kwargs: jobs)
+    monkeypatch.setattr(score_jobs.supabase_utils, "update_job_score", lambda job_id, score, **kwargs: updates.append((job_id, score, kwargs)) or True)
+    monkeypatch.setattr(score_jobs.supabase_utils, "release_lane_score_claim", lambda *args, **kwargs: releases.append((args, kwargs)) or True)
+    batches = []
+    monkeypatch.setattr(score_jobs.config, "JOB_SCORE_BATCH_SIZE", 1)
+    monkeypatch.setattr(score_jobs, "get_resume_scores_from_ai", lambda _resume, batch: batches.append([job["job_id"] for job in batch]) or {job["job_id"]: 80 for job in batch})
+    monkeypatch.setattr(score_jobs, "rescore_jobs_with_custom_resume", lambda **_kwargs: {"claimed": 0, "scored": 0, "failed": 0})
+
+    result = score_jobs.main("technology_delivery", run_filter_prepass=False, worker_id="worker")
+
+    assert [(job_id, score) for job_id, score, _kwargs in updates] == [("job-1", 80), ("job-2", 80)]
+    assert result["initial_claimed"] == 2
+    assert result["initial_scored"] == 2
+    assert batches == [["job-1"], ["job-2"]]
+    assert releases == []
+
+
+def test_main_releases_omitted_score_claim_once(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    monkeypatch.setattr(score_jobs, "supabase_utils", supabase_utils)
+    releases = []
+    monkeypatch.setattr(score_jobs.supabase_utils, "get_archetype_base_resume", lambda _lane: {"name": "Jane", "base_resume_id": "base"})
+    monkeypatch.setattr(score_jobs.supabase_utils, "get_jobs_to_score", lambda *_args, **_kwargs: [{"job_id": "job-1", "description": "One"}])
+    monkeypatch.setattr(score_jobs, "get_resume_scores_from_ai", lambda *_args: {})
+    monkeypatch.setattr(score_jobs.supabase_utils, "release_lane_score_claim", lambda *args, **kwargs: releases.append((args, kwargs)) or True)
+    monkeypatch.setattr(score_jobs, "rescore_jobs_with_custom_resume", lambda **_kwargs: {"claimed": 0, "scored": 0, "failed": 0})
+
+    result = score_jobs.main("technology_delivery", run_filter_prepass=False, worker_id="worker")
+
+    assert result["initial_failed"] == 1
+    assert releases == [(('job-1', 'technology_delivery', 'worker'), {"failed": True})]
 
 
 def test_scheduled_scoring_skips_successfully_when_db_setting_is_false(monkeypatch):
