@@ -17,6 +17,11 @@ on:
         required: false
         default: ""
         type: string
+      drain_backlog:
+        description: "Run bounded repeated passes until queues empty or time budget is reached"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: lane-scoring
@@ -52,4 +57,5 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JOBS_TO_SCORE_PER_RUN: ${{ inputs.jobs_per_run || '50' }}
           JOB_SCORE_ARCHETYPE: ${{ inputs.archetype || '' }}
+          JOB_SCORE_DRAIN_BACKLOG: ${{ inputs.drain_backlog || 'false' }}
         run: python score_jobs.py # Execute the job scoring script

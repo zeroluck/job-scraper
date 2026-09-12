@@ -73,6 +73,59 @@ def test_scheduled_scoring_loads_db_setting_before_lane_orchestration(monkeypatc
     ]
 
 
+def test_backlog_drain_stops_when_a_pass_claims_no_work(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    calls = []
+    results = iter([
+        {"lane": {
+            "initial_claimed": 1,
+            "initial_scored": 1,
+            "rescore_claimed": 0,
+            "rescore_scored": 0,
+        }},
+        {"lane": {
+            "initial_claimed": 0,
+            "initial_scored": 0,
+            "rescore_claimed": 0,
+            "rescore_scored": 0,
+        }},
+    ])
+    monkeypatch.setattr(
+        score_jobs,
+        "run_configured_scoring",
+        lambda *_args, **_kwargs: calls.append("pass") or next(results),
+    )
+    monkeypatch.setattr(score_jobs.time, "monotonic", lambda: 0)
+
+    result = score_jobs.run_scheduled_scoring(
+        db=object(), drain_backlog=True
+    )
+
+    assert calls == ["pass", "pass"]
+    assert result["status"] == "completed"
+    assert len(result["passes"]) == 2
+
+
+def test_backlog_drain_stops_after_zero_progress(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    calls = []
+    monkeypatch.setattr(
+        score_jobs,
+        "run_configured_scoring",
+        lambda *_args, **_kwargs: calls.append("pass") or {"lane": {
+            "initial_claimed": 2,
+            "initial_scored": 0,
+            "rescore_claimed": 0,
+            "rescore_scored": 0,
+        }},
+    )
+    monkeypatch.setattr(score_jobs.time, "monotonic", lambda: 0)
+
+    score_jobs.run_scheduled_scoring(db=object(), drain_backlog=True)
+
+    assert calls == ["pass"]
+
+
 def test_get_top_scored_jobs_to_apply_excludes_filtered_jobs(monkeypatch):
     class FakeQuery:
         def __init__(self):

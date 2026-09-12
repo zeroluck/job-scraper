@@ -80,7 +80,9 @@ def test_scoring_capacity_exceeds_recent_daily_ingestion_without_overlapping_run
     step = score["jobs"]["score"]["steps"][-1]
 
     assert inputs["jobs_per_run"]["default"] == "50"
+    assert inputs["drain_backlog"]["default"] is False
     assert step["env"]["JOBS_TO_SCORE_PER_RUN"] == "${{ inputs.jobs_per_run || '50' }}"
+    assert step["env"]["JOB_SCORE_DRAIN_BACKLOG"] == "${{ inputs.drain_backlog || 'false' }}"
     assert score["jobs"]["score"]["timeout-minutes"] == 210
 
 

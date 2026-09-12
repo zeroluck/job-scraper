@@ -222,7 +222,7 @@ def rescore_jobs_with_custom_resume(
     if not jobs_to_rescore:
         logging.info("No jobs require re-scoring with custom resumes at this time.")
         logging.info("--- Job Re-scoring Finished (No Jobs) ---")
-        return
+        return {"claimed": 0, "scored": 0, "failed": 0}
 
     logging.info(f"Processing {len(jobs_to_rescore)} jobs for re-scoring...")
     successful_rescores = 0
@@ -263,9 +263,6 @@ def rescore_jobs_with_custom_resume(
             failed_rescores += 1
             if worker_id:
                 supabase_utils.release_lane_score_claim(job_id, archetype, worker_id, failed=True)
-            if i < len(jobs_to_rescore) - 1:
-                logging.debug(f"Waiting {config.LLM_REQUEST_DELAY_SECONDS} seconds before next job...")
-                time.sleep(config.LLM_REQUEST_DELAY_SECONDS)
             continue
         
         logging.debug(f"Custom resume text for job {job_id} (first 200 chars): {custom_resume_text[:200]}")
@@ -286,15 +283,16 @@ def rescore_jobs_with_custom_resume(
         if not completed and worker_id:
             supabase_utils.release_lane_score_claim(job_id, archetype, worker_id, failed=True)
 
-        if i < len(jobs_to_rescore) - 1: 
-            logging.debug(f"Waiting {config.LLM_REQUEST_DELAY_SECONDS} seconds before next API call...")
-            time.sleep(config.LLM_REQUEST_DELAY_SECONDS)
-
     rescore_end_time = time.time()
     logging.info("--- Job Re-scoring Finished ---")
     logging.info(f"Successfully re-scored: {successful_rescores}")
     logging.info(f"Failed/Skipped re-scores: {failed_rescores}")
     logging.info(f"Total re-scoring time: {rescore_end_time - rescore_start_time:.2f} seconds")
+    return {
+        "claimed": len(jobs_to_rescore),
+        "scored": successful_rescores,
+        "failed": failed_rescores,
+    }
 
 # --- Main Execution ---
 
@@ -381,10 +379,6 @@ def main(
                             job_id, archetype, worker_id, failed=True
                         )
 
-                if i < len(jobs_to_score_initially) - 1:
-                    logging.debug(f"Waiting {config.LLM_REQUEST_DELAY_SECONDS} seconds before next API call...")
-                    time.sleep(config.LLM_REQUEST_DELAY_SECONDS)
-            
             initial_score_end_time = time.time()
             logging.info("--- Initial Scoring Phase Finished ---")
             logging.info(f"Successfully initially scored: {successful_initial_scores}")
@@ -392,7 +386,9 @@ def main(
             logging.info(f"Total initial scoring time: {initial_score_end_time - initial_score_start_time:.2f} seconds")
 
     # # --- Phase 2: Re-scoring with Custom Resumes ---
-    rescore_jobs_with_custom_resume(archetype=archetype, worker_id=worker_id)
+    rescore_result = rescore_jobs_with_custom_resume(
+        archetype=archetype, worker_id=worker_id
+    )
 
     overall_end_time = time.time()
     logging.info("--- Job Scoring Script Finished (All Phases) ---")
@@ -403,10 +399,16 @@ def main(
         "initial_claimed": initial_claimed,
         "initial_scored": successful_initial_scores,
         "initial_failed": failed_initial_scores,
+        "rescore_claimed": rescore_result["claimed"],
+        "rescore_scored": rescore_result["scored"],
+        "rescore_failed": rescore_result["failed"],
     }
 
 
-def run_scheduled_scoring(*, db=None, archetype_override: str | None = None):
+def run_scheduled_scoring(
+    *, db=None, archetype_override: str | None = None,
+    drain_backlog: bool | None = None,
+):
     """Run configured lane scoring, or return success/skipped when scoring is disabled.
 
     This is the scheduled entrypoint. There is intentionally no implicit manual
@@ -427,11 +429,42 @@ def run_scheduled_scoring(*, db=None, archetype_override: str | None = None):
         prepass_complete = True
         return result
 
-    return run_configured_scoring(
-        run_lane,
-        db=db,
-        archetype_override=archetype_override,
-    )
+    if drain_backlog is None:
+        drain_backlog = os.getenv("JOB_SCORE_DRAIN_BACKLOG", "false").lower() == "true"
+    deadline = time.monotonic() + 320 * 60
+    passes = []
+    for pass_number in range(1, 9):
+        logging.info("Starting scoring pass %s%s.", pass_number, "/8" if drain_backlog else "")
+        result = run_configured_scoring(
+            run_lane,
+            db=db,
+            archetype_override=archetype_override,
+        )
+        passes.append(result)
+        if not drain_backlog or not isinstance(result, dict):
+            break
+        if result.get("status") == "skipped_score_jobs_disabled":
+            break
+        claimed = sum(
+            lane_result.get("initial_claimed", 0)
+            + lane_result.get("rescore_claimed", 0)
+            for lane_result in result.values()
+            if isinstance(lane_result, dict)
+        )
+        scored = sum(
+            lane_result.get("initial_scored", 0)
+            + lane_result.get("rescore_scored", 0)
+            for lane_result in result.values()
+            if isinstance(lane_result, dict)
+        )
+        if claimed == 0 or scored == 0:
+            break
+        if time.monotonic() + 50 * 60 >= deadline:
+            logging.info("Stopping backlog drain before the workflow time budget.")
+            break
+    if len(passes) == 1:
+        return passes[0]
+    return {"status": "completed", "passes": passes}
 
 
 def run_manual_scoring_ignoring_score_jobs_setting(archetype: str):
