@@ -84,6 +84,10 @@ def test_scoring_capacity_exceeds_recent_daily_ingestion_without_overlapping_run
     assert step["env"]["JOBS_TO_SCORE_PER_RUN"] == "${{ inputs.jobs_per_run || '50' }}"
     assert step["env"]["JOB_SCORE_DRAIN_BACKLOG"] == "${{ inputs.drain_backlog || 'false' }}"
     assert score["jobs"]["score"]["timeout-minutes"] == 360
+    assert triggers(score)["schedule"] == [{
+        "cron": "0 2,5,8,23 * * *",
+        "timezone": "America/New_York",
+    }]
 
 
 def test_all_linkedin_producer_workflows_share_source_concurrency_group():
