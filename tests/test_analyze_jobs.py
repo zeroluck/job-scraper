@@ -442,6 +442,21 @@ def test_extract_keywords_from_batch_returns_completed_partial_results():
     assert set(result) == {"1"}
 
 
+def test_extract_keywords_from_batch_defers_provider_quota_exhaustion(monkeypatch):
+    class QuotaClient:
+        def generate_content(self, **_kwargs):
+            raise RuntimeError("429 RESOURCE_EXHAUSTED quota exceeded")
+
+    monkeypatch.setattr(analyze_jobs.time, "sleep", lambda _seconds: None)
+    result = analyze_jobs.extract_keywords_from_batch(
+        [{"job_id": "1", "job_title": "A", "description": "Needs Python"}],
+        client=QuotaClient(),
+        max_retries=2,
+    )
+
+    assert result == {}
+
+
 def test_mark_jobs_analyzed_updates_timestamp_for_ids():
     calls = []
 

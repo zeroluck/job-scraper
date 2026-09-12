@@ -165,6 +165,14 @@ def extract_keywords_from_batch(batch, client=None, max_retries=None) -> dict[st
         )
         return extracted
     if last_error is not None:
+        error_text = str(last_error).lower()
+        if any(token in error_text for token in (
+            "429", "rate limit", "ratelimit", "quota", "resource_exhausted"
+        )):
+            logger.error(
+                "Deferring keyword analysis after provider quota exhaustion; jobs remain queued."
+            )
+            return extracted
         raise last_error
     return extracted
 
