@@ -139,10 +139,13 @@ def get_resume_score_from_ai(resume_text: str, job_details: Dict[str, Any]) -> O
     Score (0–100):
     """
 
+    score_text = ""
     try:
         logging.info(f"Requesting score for job_id: {job_details.get('job_id')}")
         score_text = job_scoring_client.generate_content(
             prompt=prompt,
+            reasoning_effort="low",
+            max_tokens=16,
         )
 
         # Attempt to parse the score
@@ -151,10 +154,14 @@ def get_resume_score_from_ai(resume_text: str, job_details: Dict[str, Any]) -> O
             logging.info(f"Received score {score} for job_id: {job_details.get('job_id')}")
             return score
         else:
-            logging.warning(f"Received score out of range ({score}) for job_id: {job_details.get('job_id')}. Raw response: '{score_text}'")
+            logging.warning(f"Received score out of range ({score}) for job_id: {job_details.get('job_id')}")
             return None
     except ValueError:
-        logging.error(f"Could not parse integer score from LLM response for job_id: {job_details.get('job_id')}. Raw response: '{score_text}'")
+        logging.error(
+            "Could not parse integer score for job_id %s (response_length=%s)",
+            job_details.get("job_id"),
+            len(score_text),
+        )
         return None
     except Exception as e:
         logging.error(f"Error calling LLM API for job_id {job_details.get('job_id')}: {e}")
@@ -207,7 +214,10 @@ def rescore_jobs_with_custom_resume(
     rescore_start_time = time.time()
 
     jobs_to_rescore = supabase_utils.get_jobs_to_rescore(
-        config.JOBS_TO_SCORE_PER_RUN, archetype=archetype, worker_id=worker_id
+        config.JOBS_TO_SCORE_PER_RUN,
+        archetype=archetype,
+        worker_id=worker_id,
+        lease_seconds=3600,
     )
     if not jobs_to_rescore:
         logging.info("No jobs require re-scoring with custom resumes at this time.")
@@ -297,6 +307,9 @@ def main(
     worker_id = worker_id or f"score-{uuid.uuid4()}"
     logging.info(f"--- Starting Job Scoring Script for lane {archetype} ---")
     overall_start_time = time.time()
+    initial_claimed = 0
+    successful_initial_scores = 0
+    failed_initial_scores = 0
 
     # --- Pre-pass: Flag irrelevant jobs before any LLM scoring ---
     logging.info("--- Pre-pass: Flagging filtered jobs ---")
@@ -327,14 +340,16 @@ def main(
 
         # 3. Fetch Jobs to Score
         jobs_to_score_initially = supabase_utils.get_jobs_to_score(
-            config.JOBS_TO_SCORE_PER_RUN, archetype=archetype, worker_id=worker_id
+            config.JOBS_TO_SCORE_PER_RUN,
+            archetype=archetype,
+            worker_id=worker_id,
+            lease_seconds=3600,
         )
         if not jobs_to_score_initially:
             logging.info("No jobs require initial scoring at this time.")
         else:
             logging.info(f"Processing {len(jobs_to_score_initially)} jobs for initial scoring...")
-            successful_initial_scores = 0
-            failed_initial_scores = 0
+            initial_claimed = len(jobs_to_score_initially)
 
             # 4. Loop Through Jobs and Score Them
             for i, job in enumerate(jobs_to_score_initially):
@@ -382,7 +397,13 @@ def main(
     overall_end_time = time.time()
     logging.info("--- Job Scoring Script Finished (All Phases) ---")
     logging.info(f"Total script execution time: {overall_end_time - overall_start_time:.2f} seconds")
-    return {"status": "completed", "archetype": archetype}
+    return {
+        "status": "completed",
+        "archetype": archetype,
+        "initial_claimed": initial_claimed,
+        "initial_scored": successful_initial_scores,
+        "initial_failed": failed_initial_scores,
+    }
 
 
 def run_scheduled_scoring(*, db=None, archetype_override: str | None = None):

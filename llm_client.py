@@ -155,6 +155,7 @@ class LLMClient:
         model_override: Optional[str] = None,
         reasoning_effort: Optional[str] = None,
         max_api_attempts: Optional[int] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         Generate content using the configured LLM.
@@ -187,6 +188,8 @@ class LLMClient:
 
         if temperature is not None:
             base_kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            base_kwargs["max_tokens"] = max_tokens
 
         # Add API key if set
         if self.api_key:

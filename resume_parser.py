@@ -3,11 +3,14 @@ import config
 import json
 import logging
 import models
+import os
 import re
 import sys
+import tempfile
 import time
 from llm_client import primary_client
-from pydantic import ValidationError
+from lane_catalog import canonical_context, canonical_lane_slug
+from pydantic import BaseModel, ValidationError
 
 
 logger = logging.getLogger(__name__)
@@ -180,7 +183,10 @@ def parse_resume_with_ai(resume_text):
     prompt = f"""Extract and return the structured resume information from the text below. 
     Only use what is explicitly stated in the text and do not infer or invent any details.
     
-    CRITICAL: If any information is missing or not available in the text, use "NA" for that field. 
+    Keep descriptions concise and do not repeat source text. Use at most four sentences per
+    experience or project description and include each skill only once.
+
+    CRITICAL: If any information is missing or not available in the text, use "NA" for that field.
     This applies to all fields (e.g., summary, dates, location, links, etc.). 
     Do NOT leave fields empty or use empty strings.
 
@@ -191,6 +197,8 @@ def parse_resume_with_ai(resume_text):
     response_text = primary_client.generate_content(
         prompt=prompt,
         response_format=models.Resume,
+        reasoning_effort="low",
+        max_tokens=12000,
     )
     return response_text
 
@@ -205,6 +213,16 @@ def replace_empty_with_na(data):
     elif data == "" or data is None:
         return "NA"
     return data
+
+
+def _has_meaningful_value(value):
+    if isinstance(value, BaseModel):
+        return _has_meaningful_value(value.model_dump())
+    if isinstance(value, dict):
+        return any(_has_meaningful_value(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_has_meaningful_value(item) for item in value)
+    return value not in (None, "", "NA")
 
 def parse_and_validate_resume(resume_text, max_retries=config.MAX_RETRIES):
     """
@@ -235,7 +253,7 @@ def parse_and_validate_resume(resume_text, max_retries=config.MAX_RETRIES):
                 validated.projects,
                 validated.certifications,
             )
-            if not any(value and value != "NA" for value in meaningful_fields):
+            if not any(_has_meaningful_value(value) for value in meaningful_fields):
                 raise ResumeParseError(
                     SCHEMA_VALIDATION_FAILED,
                     "usability_validation",
@@ -267,65 +285,93 @@ def parse_and_validate_resume(resume_text, max_retries=config.MAX_RETRIES):
     print(f"ERROR: Failed to parse resume after {max_retries} attempts.")
     sys.exit(1)
 
-def main():
+def parse_storage_resume(storage_key, *, local_fallback=None, storage=None):
+    """Download, parse, and always remove the temporary source PDF."""
+    if storage is None:
+        import supabase_utils
+
+        storage = supabase_utils
+
+    pdf_bytes = storage.download_resume_from_storage(storage_key)
+    temporary_path = None
+    pdf_path = None
+    try:
+        if pdf_bytes:
+            descriptor, temporary_path = tempfile.mkstemp(suffix=".pdf")
+            with os.fdopen(descriptor, "wb") as pdf_file:
+                pdf_file.write(pdf_bytes)
+            pdf_path = temporary_path
+            print(f"Successfully downloaded {storage_key} from Supabase Storage.")
+        elif local_fallback and os.path.exists(local_fallback):
+            pdf_path = local_fallback
+            print(f"Supabase Storage download failed. Using local file: {local_fallback}")
+        else:
+            raise RuntimeError(f"Could not find {storage_key} in resume storage")
+
+        resume_text = extract_text_from_pdf(pdf_path)
+        if not resume_text:
+            raise RuntimeError(f"Resume PDF {storage_key} contains no extractable text")
+        return parse_and_validate_resume(resume_text)
+    finally:
+        if temporary_path and os.path.exists(temporary_path):
+            os.remove(temporary_path)
+
+
+def _parse_target(raw_target):
+    target = str(raw_target or "").strip().lower()
+    if target in {"", "global"}:
+        return "global"
+    if target == "all":
+        return "all"
+    canonical_context(target)
+    return canonical_lane_slug(target)
+
+
+def main(target=None, db=None):
     """
     Main function to orchestrate the resume parsing process.
     Downloads the resume PDF from Supabase Storage, parses it with AI, 
     and saves the structured data to both local file and Supabase DB.
     """
-    import io
-    import os
     import supabase_utils
 
-    pdf_file_path = "./resume.pdf"
-
-    # 1. Try to download resume PDF from Supabase Storage
-    pdf_bytes = supabase_utils.download_resume_from_storage("resume.pdf")
-
-    if pdf_bytes:
-        print("Successfully downloaded resume.pdf from Supabase Storage.")
-        # Write to a temporary local file for pdfplumber
-        with open(pdf_file_path, 'wb') as f:
-            f.write(pdf_bytes)
-    elif os.path.exists(pdf_file_path):
-        print(f"Supabase Storage download failed. Using local file: {pdf_file_path}")
-    else:
-        print("ERROR: Could not find resume.pdf in Supabase Storage or locally.")
-        print("Please upload your resume.pdf to the 'resumes' bucket in your Supabase Storage dashboard.")
-        raise RuntimeError("Could not find resume.pdf in storage or locally")
-
-    # 2. Extract text from PDF
-    resume_text = extract_text_from_pdf(pdf_file_path)
-    if not resume_text:
-        print("Failed to extract text. Exiting.")
-        raise RuntimeError("Resume PDF contains no extractable text")
-
-    # 3. Parse resume text with AI
-    resume_data_dict = parse_and_validate_resume(resume_text)
-
-    # 4. Save parsed data to Supabase base_resume table
-    save_success = supabase_utils.save_base_resume(resume_data_dict)
-    if save_success:
-        print("Successfully saved parsed resume to Supabase database.")
-    else:
-        raise RuntimeError("Failed to save parsed resume to Supabase database")
-
-    # 5. Also save to local JSON file (for development/fallback)
-    output_path = config.BASE_RESUME_PATH
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(resume_data_dict, f, indent=4)
-        print(f"Successfully saved parsed resume to local file: {output_path}")
-    except Exception as e:
-        print(f"Error saving resume to {output_path}: {e}")
-
-    # 6. Clean up the temporary PDF file (don't leave sensitive data on disk in CI)
-    if pdf_bytes and os.path.exists(pdf_file_path):
+    parsed_target = _parse_target(
+        target if target is not None else os.getenv("RESUME_PARSE_ARCHETYPE", "")
+    )
+    if parsed_target == "global":
+        resume_data = parse_storage_resume(
+            "resume.pdf", local_fallback="./resume.pdf", storage=supabase_utils
+        )
+        if not supabase_utils.save_base_resume(resume_data):
+            raise RuntimeError("Failed to save parsed resume to Supabase database")
         try:
-            os.remove(pdf_file_path)
-            print(f"Cleaned up temporary file: {pdf_file_path}")
-        except Exception as e:
-            print(f"Warning: Could not clean up {pdf_file_path}: {e}")
+            with open(config.BASE_RESUME_PATH, "w", encoding="utf-8") as output:
+                json.dump(resume_data, output, indent=4)
+        except OSError as exc:
+            logger.warning("Could not write local resume cache: %s", exc)
+        print("Successfully saved parsed global resume.")
+        return {"global": resume_data}
+
+    if parsed_target == "all":
+        from downstream_orchestration import enabled_lane_slugs
+
+        if not supabase_utils.get_base_resume():
+            raise RuntimeError("Parse the global resume before parsing lane profiles")
+        lanes = enabled_lane_slugs(db or supabase_utils.supabase)
+    else:
+        lanes = (parsed_target,)
+
+    profiles = {}
+    for lane in lanes:
+        profiles[lane] = parse_storage_resume(
+            f"archetypes/{lane}.pdf", storage=supabase_utils
+        )
+    if not profiles:
+        raise RuntimeError("No enabled career lanes were available to parse")
+    if not supabase_utils.save_archetype_resume_profiles(profiles):
+        raise RuntimeError("Failed to save parsed archetype resume profiles")
+    print(f"Successfully saved parsed resume profiles for: {', '.join(profiles)}")
+    return profiles
 
     print("\nResume processing finished.")
 

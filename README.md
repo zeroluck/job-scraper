@@ -110,16 +110,18 @@ SCRAPE_CONFIG_SOURCE=env SCRAPE_CONFIG_JSON='{"version":1,...}' python scraper.p
 
 Keep `SUPABASE_SERVICE_ROLE_KEY` in environment secrets. Never place it in a configuration document or browser-exposed variable.
 
-7.  **Upload Your Resume to Supabase Storage:**
+7.  **Upload Your Resumes to Supabase Storage:**
     - In your Supabase project dashboard, navigate to **Storage** in the left sidebar.
     - Find the **`resumes`** bucket (created by the `init.sql` script in step 2).
-    - Click on the bucket, then click **"Upload files"** and upload your resume. **The file must be named `resume.pdf`**.
+    - Upload the global resume as `resume.pdf`.
+    - For lane-aware scoring, upload one PDF per enabled lane as `archetypes/<canonical-lane>.pdf`.
     - > **⚠️ Security Note:** Your resume is stored securely in your private Supabase Storage bucket — it is **never committed to the public GitHub repository**. This protects your personal information (name, email, phone, address, etc.) from being publicly visible.
 
 6.  **Parse Your Resume:**
     - Go to the "Actions" tab in your forked GitHub repository.
     - Find the workflow named "Parse Resume Manually" in the list of workflows.
-    - Click on it, and then click the "Run workflow" button. This will trigger the `resume_parser.py` script, which will download your `resume.pdf` from Supabase Storage, parse it using AI, and store the structured data securely in the `base_resume` table in your Supabase database.
+    - First select `global` to parse `resume.pdf` into `base_resume`.
+    - Then select `all` to parse every enabled lane PDF and atomically update `archetype_resume_profiles`. A single canonical lane can be selected for targeted recovery.
 
 7.  **Configure Job Search Parameters (Edit `config.py`):**
     - In your forked GitHub repository, navigate to the [config.py](config.py) file.

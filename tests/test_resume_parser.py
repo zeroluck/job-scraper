@@ -9,6 +9,7 @@ from resume_parser import (
     ResumeParseError,
     extract_first_json_object,
     parse_and_validate_resume,
+    _parse_target,
 )
 
 def test_parse_and_validate_resume_success():
@@ -19,6 +20,16 @@ def test_parse_and_validate_resume_success():
         result = parse_and_validate_resume("some text")
         assert result["name"] == mock_data["name"]
         assert result["experience"] == mock_data["experience"]
+
+
+def test_resume_parser_bounds_output_and_reasoning():
+    with patch("resume_parser.primary_client.generate_content", return_value="{}") as generate:
+        from resume_parser import parse_resume_with_ai
+
+        parse_resume_with_ai("resume text")
+
+    assert generate.call_args.kwargs["max_tokens"] == 12000
+    assert generate.call_args.kwargs["reasoning_effort"] == "low"
 
 def test_parse_and_validate_resume_retry_then_success():
     mock_data = {"name": "John Doe", "experience": []}
@@ -139,7 +150,13 @@ def test_parse_and_validate_resume_replaces_empty_with_na():
         assert {key: result[key] for key in expected_data} == expected_data
 
 
-@pytest.mark.parametrize("payload", [{}, {"unexpected": "payload"}, {"name": "NA"}])
+@pytest.mark.parametrize("payload", [
+    {},
+    {"unexpected": "payload"},
+    {"name": "NA"},
+    {"skills": ["NA"]},
+    {"experience": [{}]},
+])
 def test_parse_and_validate_resume_rejects_unusable_or_unknown_payload(payload):
     with patch('resume_parser.parse_resume_with_ai', return_value=json.dumps(payload)):
         with patch('time.sleep'):
@@ -158,3 +175,80 @@ def test_main_fails_when_database_save_fails(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to save parsed resume"):
         main()
+
+
+def test_lane_main_uses_canonical_storage_path_and_atomic_profile_save(monkeypatch):
+    parsed = {"name": "Jane", "skills": ["Routing"]}
+    sources = []
+    saved = []
+    monkeypatch.setattr(
+        "resume_parser.parse_storage_resume",
+        lambda key, **_kwargs: sources.append(key) or parsed,
+    )
+    monkeypatch.setattr(
+        "supabase_utils.save_archetype_resume_profiles",
+        lambda profiles: saved.append(profiles) or True,
+    )
+
+    from resume_parser import main
+
+    result = main("software_tpm")
+
+    assert sources == ["archetypes/technology_delivery.pdf"]
+    assert saved == [{"technology_delivery": parsed}]
+    assert result == saved[0]
+
+
+def test_all_lane_main_stages_every_parse_before_one_save(monkeypatch):
+    lanes = ("technology_delivery", "network_infrastructure")
+    calls = []
+    monkeypatch.setattr(
+        "downstream_orchestration.enabled_lane_slugs", lambda _db: lanes
+    )
+    monkeypatch.setattr("supabase_utils.get_base_resume", lambda: {"name": "Base"})
+    monkeypatch.setattr(
+        "resume_parser.parse_storage_resume",
+        lambda key, **_kwargs: calls.append(("parse", key)) or {"name": key},
+    )
+    monkeypatch.setattr(
+        "supabase_utils.save_archetype_resume_profiles",
+        lambda profiles: calls.append(("save", tuple(profiles))) or True,
+    )
+
+    from resume_parser import main
+
+    main("all", db=object())
+
+    assert calls == [
+        ("parse", "archetypes/technology_delivery.pdf"),
+        ("parse", "archetypes/network_infrastructure.pdf"),
+        ("save", lanes),
+    ]
+
+
+def test_all_lane_main_does_not_save_partial_results(monkeypatch):
+    monkeypatch.setattr(
+        "downstream_orchestration.enabled_lane_slugs",
+        lambda _db: ("technology_delivery", "network_infrastructure"),
+    )
+    monkeypatch.setattr("supabase_utils.get_base_resume", lambda: {"name": "Base"})
+    parse_calls = iter(({"name": "Jane"}, RuntimeError("missing source")))
+
+    def parse(_key, **_kwargs):
+        result = next(parse_calls)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr("resume_parser.parse_storage_resume", parse)
+    save = patch("supabase_utils.save_archetype_resume_profiles")
+    with save as mock_save, pytest.raises(RuntimeError, match="missing source"):
+        from resume_parser import main
+
+        main("all", db=object())
+    mock_save.assert_not_called()
+
+
+def test_parse_target_rejects_unknown_and_path_like_lanes():
+    with pytest.raises(ValueError, match="Unknown career lane"):
+        _parse_target("../resume.pdf")

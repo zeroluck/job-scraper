@@ -162,7 +162,9 @@ DESC_BLOCKLIST = ARCHETYPE_CONFIGS[DEFAULT_ARCHETYPE]["desc_blocklist"]
 
 # --- Processing Limits ---
 SCRAPING_SOURCES = ["linkedin"] # "linkedin", "careers_future"
-JOBS_TO_SCORE_PER_RUN = int(os.environ.get("JOBS_TO_SCORE_PER_RUN", "25"))
+JOBS_TO_SCORE_PER_RUN = min(
+    50, max(1, int(os.environ.get("JOBS_TO_SCORE_PER_RUN", "50")))
+)
 JOBS_TO_CUSTOMIZE_PER_RUN = 1
 MAX_JOBS_PER_SEARCH = {
     "linkedin": None,

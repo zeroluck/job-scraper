@@ -31,8 +31,9 @@ def test_get_resume_score_uses_job_scoring_client_without_reasoning(monkeypatch)
     )
 
     assert result == 87
-    assert "reasoning_effort" not in calls[0]
+    assert calls[0]["reasoning_effort"] == "low"
     assert "temperature" not in calls[0]
+    assert calls[0]["max_tokens"] == 16
 
 
 def test_scheduled_scoring_skips_successfully_when_db_setting_is_false(monkeypatch):

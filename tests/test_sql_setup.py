@@ -1154,3 +1154,22 @@ def test_remediation_migrations_are_transactional_and_define_atomic_rpcs():
     assert "jobs_invalidate_freehire_compat_input" in freehire
     assert "apply_linkedin_relist_projection" in relists
     assert '"replace_base_resume"' in init
+
+
+def test_lane_resume_profile_migration_is_atomic_and_base_replacement_is_fk_safe():
+    migration = (ROOT / "supabase_setup" / "add_lane_aware_resume_profiles.sql").read_text()
+    init = (ROOT / "supabase_setup" / "init.sql").read_text()
+
+    assert migration.lstrip().startswith("BEGIN;")
+    assert migration.rstrip().endswith("COMMIT;")
+    assert "replace_archetype_resume_profiles" in migration
+    assert "CREATE OR REPLACE FUNCTION public.replace_base_resume" in migration
+    migration_replace_body = migration.split("CREATE OR REPLACE FUNCTION public.replace_base_resume", 1)[1].split("$$;", 1)[0]
+    assert "DELETE FROM public.base_resume" not in migration_replace_body
+    assert "FOR UPDATE" in migration_replace_body
+    assert "jsonb_each(p_profiles)" in migration
+    assert "ON CONFLICT (archetype) DO UPDATE" in migration
+    assert "FROM PUBLIC, anon, authenticated" in migration
+    replace_body = init.split('CREATE OR REPLACE FUNCTION "public"."replace_base_resume"', 1)[1].split("$$;", 1)[0]
+    assert "DELETE FROM public.base_resume" not in replace_body
+    assert "FOR UPDATE" in replace_body

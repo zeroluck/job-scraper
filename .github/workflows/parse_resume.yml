@@ -2,6 +2,21 @@ name: Parse Resume Manually
 
 on:
   workflow_dispatch:
+    inputs:
+      archetype:
+        description: "Canonical lane, all enabled lanes, or global legacy resume"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - technology_delivery
+          - systems_platform_ops
+          - network_infrastructure
+          - datacenter_operations
+          - ai_workflow_automation
+          - building_controls
+          - global
 
 concurrency:
   group: parse-base-resume
@@ -44,4 +59,5 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          RESUME_PARSE_ARCHETYPE: ${{ inputs.archetype }}
         run: python resume_parser.py

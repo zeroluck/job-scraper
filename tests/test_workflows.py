@@ -29,6 +29,20 @@ def test_downstream_workflows_default_to_enabled_lanes_with_optional_override():
     assert scrape_step["env"]["SCRAPE_ARCHETYPE"] == "${{ inputs.archetype || '' }}"
 
 
+def test_resume_parser_workflow_defaults_to_all_lanes():
+    workflow = load_workflow("parse_resume.yml")
+    dispatch = triggers(workflow)["workflow_dispatch"]
+    parse_step = workflow["jobs"]["parse_resume_job"]["steps"][-1]
+
+    assert dispatch["inputs"]["archetype"]["default"] == "all"
+    assert dispatch["inputs"]["archetype"]["options"][-1] == "global"
+    assert parse_step["env"]["RESUME_PARSE_ARCHETYPE"] == "${{ inputs.archetype }}"
+    assert workflow["concurrency"] == {
+        "group": "parse-base-resume",
+        "cancel-in-progress": False,
+    }
+
+
 def test_scrape_workflow_exports_only_manual_recovery_lookback():
     hourly = load_workflow("scrape_jobs.yml")
     recovery_step = next(
@@ -58,6 +72,16 @@ def test_scoring_and_resume_workflows_have_defense_in_depth_concurrency_groups()
     resume = load_workflow("hourly_resume_customization.yml")
     assert score["concurrency"] == {"group": "lane-scoring", "cancel-in-progress": False}
     assert resume["concurrency"] == {"group": "lane-resume-generation", "cancel-in-progress": False}
+
+
+def test_scoring_capacity_exceeds_recent_daily_ingestion_without_overlapping_runs():
+    score = load_workflow("score_jobs.yml")
+    inputs = triggers(score)["workflow_dispatch"]["inputs"]
+    step = score["jobs"]["score"]["steps"][-1]
+
+    assert inputs["jobs_per_run"]["default"] == "50"
+    assert step["env"]["JOBS_TO_SCORE_PER_RUN"] == "${{ inputs.jobs_per_run || '50' }}"
+    assert score["jobs"]["score"]["timeout-minutes"] == 210
 
 
 def test_all_linkedin_producer_workflows_share_source_concurrency_group():

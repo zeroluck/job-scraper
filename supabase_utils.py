@@ -9,6 +9,7 @@ import hashlib
 import logging # Import logging
 import re # Import re for filter pattern matching
 import string
+import time
 import unicodedata
 import html
 import json
@@ -2757,6 +2758,8 @@ def get_jobs_to_score(
 
     except Exception as e:
         logging.error(f"Error fetching jobs to score from Supabase: {e}")
+        if archetype:
+            raise
         return []
 
 def get_top_scored_jobs_to_apply(limit: int) -> list:
@@ -2874,6 +2877,8 @@ def get_jobs_to_rescore(
 
     except Exception as e:
         logging.error(f"Exception calling RPC get_jobs_for_rescore: {e}", exc_info=True)
+        if archetype:
+            raise
         return []
 
 def update_job_score(
@@ -2895,12 +2900,23 @@ def update_job_score(
     try:
         logging.info(f"Updating score for job_id {job_id} to {score} and stage to {resume_score_stage}...")
         if archetype and worker_id:
-            response = supabase.rpc("complete_lane_score_claim", {
-                "p_job_id": job_id, "p_archetype": canonical_lane_slug(archetype),
-                "p_worker_id": worker_id, "p_score": score,
-                "p_score_stage": resume_score_stage,
-            }).execute()
-            return response.data is True
+            for attempt in range(3):
+                try:
+                    response = supabase.rpc("complete_lane_score_claim", {
+                        "p_job_id": job_id, "p_archetype": canonical_lane_slug(archetype),
+                        "p_worker_id": worker_id, "p_score": score,
+                        "p_score_stage": resume_score_stage,
+                    }).execute()
+                    return response.data is True
+                except Exception as exc:
+                    if "57014" not in str(exc) or attempt == 2:
+                        raise
+                    logging.warning(
+                        "Score completion timed out for job_id %s; retrying (%s/3).",
+                        job_id,
+                        attempt + 1,
+                    )
+                    time.sleep(2 ** attempt)
         update_payload = ({
             "match_score": score,
             "score_stage": resume_score_stage,
@@ -3281,6 +3297,26 @@ def save_base_resume(resume_data: dict) -> bool:
 
     except Exception as e:
         logging.error(f"Error saving base resume to Supabase: {e}", exc_info=True)
+        return False
+
+
+def save_archetype_resume_profiles(profiles: dict[str, dict]) -> bool:
+    """Atomically replace one or more complete lane resume profiles."""
+    if not profiles or any(not isinstance(value, dict) or not value for value in profiles.values()):
+        logging.error("Archetype resume profiles must be non-empty resume objects.")
+        return False
+    try:
+        response = supabase.rpc(
+            "replace_archetype_resume_profiles",
+            {"p_profiles": profiles},
+        ).execute()
+        if response.data is True or response.data == [True]:
+            logging.info("Successfully replaced archetype resume profiles atomically.")
+            return True
+        logging.error("Profile replacement returned an unexpected response: %r", response.data)
+        return False
+    except Exception as exc:
+        logging.error("Error saving archetype resume profiles: %s", exc, exc_info=True)
         return False
 
 
