@@ -30,7 +30,7 @@ concurrency:
 jobs:
   score:
     runs-on: ubuntu-latest # Use a standard Linux runner
-    timeout-minutes: 210
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository code

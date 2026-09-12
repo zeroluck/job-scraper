@@ -433,8 +433,8 @@ def run_scheduled_scoring(
         drain_backlog = os.getenv("JOB_SCORE_DRAIN_BACKLOG", "false").lower() == "true"
     deadline = time.monotonic() + 320 * 60
     passes = []
-    for pass_number in range(1, 9):
-        logging.info("Starting scoring pass %s%s.", pass_number, "/8" if drain_backlog else "")
+    for pass_number in range(1, 21):
+        logging.info("Starting scoring pass %s%s.", pass_number, "/20" if drain_backlog else "")
         result = run_configured_scoring(
             run_lane,
             db=db,
