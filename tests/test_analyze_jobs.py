@@ -195,6 +195,7 @@ def test_extract_keywords_from_batch_uses_llm_client_response_format():
     assert len(calls) == 1
     assert "temperature" not in calls[0]
     assert calls[0]["reasoning_effort"] == "low"
+    assert calls[0]["max_api_attempts"] == 2
     assert calls[0]["response_format"] is analyze_jobs.JobKeywordResultList
     assert "Project Manager" in calls[0]["prompt"]
     assert "Must know Agile and Python." in calls[0]["prompt"]
@@ -444,17 +445,22 @@ def test_extract_keywords_from_batch_returns_completed_partial_results():
 
 def test_extract_keywords_from_batch_defers_provider_quota_exhaustion(monkeypatch):
     class QuotaClient:
+        calls = 0
+
         def generate_content(self, **_kwargs):
+            self.calls += 1
             raise RuntimeError("429 RESOURCE_EXHAUSTED quota exceeded")
 
     monkeypatch.setattr(analyze_jobs.time, "sleep", lambda _seconds: None)
+    client = QuotaClient()
     result = analyze_jobs.extract_keywords_from_batch(
         [{"job_id": "1", "job_title": "A", "description": "Needs Python"}],
-        client=QuotaClient(),
+        client=client,
         max_retries=2,
     )
 
     assert result == {}
+    assert client.calls == 1
 
 
 def test_fetch_unanalyzed_jobs_retries_statement_timeout(monkeypatch):

@@ -347,6 +347,7 @@ def classify_batch(
                     system_prompt=SYSTEM_PROMPT,
                     reasoning_effort="low",
                     response_format=FreehireClassificationBatch,
+                    max_api_attempts=2,
                 )
                 outcome.requests += 1
                 parsed, errors = _parse_response(raw, set(remaining))

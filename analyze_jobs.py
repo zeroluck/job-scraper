@@ -147,6 +147,7 @@ def extract_keywords_from_batch(batch, client=None, max_retries=None) -> dict[st
                 system_prompt=SYSTEM_PROMPT,
                 reasoning_effort="low",
                 response_format=JobKeywordResultList,
+                max_api_attempts=2,
             )
             parsed = parse_keyword_response(raw_response)
             received_valid_response = True
@@ -163,6 +164,11 @@ def extract_keywords_from_batch(batch, client=None, max_retries=None) -> dict[st
             )
         except Exception as exc:
             last_error = exc
+            error_text = str(exc).lower()
+            if any(token in error_text for token in (
+                "429", "rate limit", "ratelimit", "quota", "resource_exhausted"
+            )):
+                break
         logger.warning("Keyword extraction failed on attempt %s: %s", attempt + 1, last_error)
         if attempt < max_retries - 1:
             time.sleep(config.JOB_INSIGHTS_SLEEP_SECONDS)

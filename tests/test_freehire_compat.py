@@ -124,7 +124,7 @@ def test_classifier_retries_only_missing_or_invalid_ids_and_uses_schema(monkeypa
     assert set(outcome.results) == {"1", "2"}
     assert outcome.failures == {}
     assert calls[0]["response_format"] is freehire_compat.FreehireClassificationBatch
-    assert "max_api_attempts" not in calls[0]
+    assert calls[0]["max_api_attempts"] == 2
     assert "Job ID: 1" in calls[0]["prompt"] and "Job ID: 2" in calls[0]["prompt"]
     assert "Job ID: 1" not in calls[1]["prompt"] and "Job ID: 2" in calls[1]["prompt"]
 
