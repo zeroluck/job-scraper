@@ -35,6 +35,7 @@ def test_get_resume_score_uses_job_scoring_client_without_reasoning(monkeypatch)
     assert calls[0]["reasoning_effort"] == "low"
     assert "temperature" not in calls[0]
     assert calls[0]["max_tokens"] == 16
+    assert calls[0]["max_api_attempts"] == 2
 
 
 def test_batch_scoring_returns_only_requested_valid_jobs(monkeypatch):
@@ -71,6 +72,27 @@ def test_batch_scoring_rejects_invalid_or_malformed_output(monkeypatch):
         "job_id": "job-1",
         "description": "Lead delivery",
     }]) == {}
+
+
+def test_batch_scoring_does_not_fallback_per_job_after_quota_exhaustion(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    fallback_calls = []
+
+    class QuotaClient:
+        def generate_content(self, **_kwargs):
+            raise RuntimeError("429 RESOURCE_EXHAUSTED quota")
+
+    monkeypatch.setattr(score_jobs, "job_scoring_client", QuotaClient())
+    monkeypatch.setattr(
+        score_jobs,
+        "get_resume_score_from_ai",
+        lambda *_args: fallback_calls.append(True) or 50,
+    )
+
+    assert score_jobs.get_resume_scores_from_ai("resume", [{
+        "job_id": "job-1", "description": "One"
+    }]) == {}
+    assert fallback_calls == []
 
 
 def test_batch_scoring_preserves_valid_items_and_recovers_missing(monkeypatch):
@@ -167,6 +189,27 @@ def test_main_releases_omitted_score_claim_once(monkeypatch):
 
     assert result["initial_failed"] == 1
     assert releases == [(('job-1', 'technology_delivery', 'worker'), {"failed": True})]
+
+
+def test_main_stops_lane_and_releases_remaining_claims_after_empty_batch(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    monkeypatch.setattr(score_jobs, "supabase_utils", supabase_utils)
+    jobs = [
+        {"job_id": "job-1", "description": "One"},
+        {"job_id": "job-2", "description": "Two"},
+    ]
+    releases = []
+    monkeypatch.setattr(score_jobs.config, "JOB_SCORE_BATCH_SIZE", 1)
+    monkeypatch.setattr(score_jobs.supabase_utils, "get_archetype_base_resume", lambda _lane: {"name": "Jane", "base_resume_id": "base"})
+    monkeypatch.setattr(score_jobs.supabase_utils, "get_jobs_to_score", lambda *_args, **_kwargs: jobs)
+    monkeypatch.setattr(score_jobs, "get_resume_scores_from_ai", lambda *_args: {})
+    monkeypatch.setattr(score_jobs.supabase_utils, "release_lane_score_claim", lambda job_id, *_args, **_kwargs: releases.append(job_id) or True)
+    monkeypatch.setattr(score_jobs, "rescore_jobs_with_custom_resume", lambda **_kwargs: {"claimed": 0, "scored": 0, "failed": 0})
+
+    result = score_jobs.main("technology_delivery", run_filter_prepass=False, worker_id="worker")
+
+    assert releases == ["job-1", "job-2"]
+    assert result["initial_failed"] == 2
 
 
 def test_scheduled_scoring_skips_successfully_when_db_setting_is_false(monkeypatch):

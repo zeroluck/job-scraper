@@ -29,6 +29,13 @@ class JobScoreResult(BaseModel):
 class JobScoreResultList(BaseModel):
     jobs: list[JobScoreResult]
 
+
+def _is_provider_quota_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return any(token in text for token in (
+        "429", "rate limit", "ratelimit", "quota", "resource_exhausted"
+    ))
+
 def format_resume_to_text(resume_data: Dict[str, Any]) -> str:
     """
     Formats the structured resume data dictionary into a plain text string.
@@ -161,6 +168,7 @@ def get_resume_score_from_ai(resume_text: str, job_details: Dict[str, Any]) -> O
             ),
             reasoning_effort="low",
             max_tokens=16,
+            max_api_attempts=2,
         )
 
         # Attempt to parse the score
@@ -196,6 +204,7 @@ def get_resume_scores_from_ai(
         return {}
     scores = {}
     pending = dict(jobs_by_id)
+    quota_exhausted = False
     for attempt in range(2):
         lines = ["--- RESUME ---", resume_text, "--- JOBS ---"]
         for job_id, job in pending.items():
@@ -221,6 +230,7 @@ def get_resume_scores_from_ai(
                 response_format=JobScoreResultList,
                 reasoning_effort="low",
                 max_tokens=1000,
+                max_api_attempts=2,
             )
             payload = json.loads(response)
             raw_items = payload.get("jobs", []) if isinstance(payload, dict) else []
@@ -263,7 +273,12 @@ def get_resume_scores_from_ai(
                 len(pending),
                 exc,
             )
+            if _is_provider_quota_error(exc):
+                quota_exhausted = True
+                break
 
+    if quota_exhausted:
+        return scores
     for job_id, job in pending.items():
         bounded_job = dict(job)
         bounded_job["description"] = str(job.get("description", ""))[
@@ -461,6 +476,21 @@ def main(
             for start in range(0, len(jobs_to_score_initially), batch_size):
                 batch = jobs_to_score_initially[start:start + batch_size]
                 scores = get_resume_scores_from_ai(default_resume_text, batch)
+                if not scores:
+                    remaining = jobs_to_score_initially[start:]
+                    for unscored_job in remaining:
+                        unscored_job_id = unscored_job.get("job_id")
+                        if unscored_job_id:
+                            supabase_utils.release_lane_score_claim(
+                                unscored_job_id, archetype, worker_id, failed=True
+                            )
+                    failed_initial_scores += len(remaining)
+                    logging.error(
+                        "Stopping lane %s after a zero-result scoring batch; released %s claims.",
+                        archetype,
+                        len(remaining),
+                    )
+                    break
                 for job in batch:
                     job_id = job.get("job_id")
                     completed = False
