@@ -188,19 +188,19 @@ LLM_REQUEST_DELAY_SECONDS = 8
 
 JOB_SCORING_MODEL_CHAIN = [
     "gemini/gemini-3.1-flash-lite",
-    "gemini/gemma-4-31b-it",
-    "gemini/gemini-3-flash-preview",
-    "gemini/gemma-4-26b-a4b-it",
-    "gemini/gemini-2.5-flash",
     "gemini/gemini-2.5-flash-lite",
+    "gemini/gemini-2.5-flash",
+    "gemini/gemini-3-flash-preview",
+    "gemini/gemma-4-31b-it",
+    "gemini/gemma-4-26b-a4b-it",
 ]
 
 JOB_INSIGHTS_MODEL_CHAIN = [
     "gemini/gemini-3.1-flash-lite",
+    "gemini/gemini-2.5-flash-lite",
+    "gemini/gemini-2.5-flash",
     "gemini/gemma-4-26b-a4b-it",
     "gemini/gemma-4-31b-it",
-    "gemini/gemini-2.5-flash",
-    "gemini/gemini-2.5-flash-lite",
     "gemini/gemini-3-flash-preview",
 ]
 

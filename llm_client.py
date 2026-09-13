@@ -31,6 +31,43 @@ import config
 logger = logging.getLogger(__name__)
 
 
+class LLMResponseError(RuntimeError):
+    """Raised when a provider returns no usable completion."""
+
+
+def _response_content(response: Any, response_format: Optional[Type[BaseModel]]) -> str:
+    choices = getattr(response, "choices", None)
+    if not choices:
+        raise LLMResponseError("LLM returned no choices")
+
+    choice = choices[0]
+    finish_reason = getattr(choice, "finish_reason", None)
+    if hasattr(finish_reason, "value"):
+        finish_reason = finish_reason.value
+    normalized_reason = str(finish_reason or "unknown").lower()
+    if normalized_reason in {"length", "max_tokens", "max_output_tokens"}:
+        raise LLMResponseError(
+            f"LLM output was truncated (finish_reason={finish_reason})"
+        )
+
+    message = getattr(choice, "message", None)
+    content = getattr(message, "content", None)
+    if not isinstance(content, str) or not content.strip():
+        raise LLMResponseError(
+            f"LLM returned empty content (finish_reason={finish_reason or 'unknown'})"
+        )
+
+    content = content.strip()
+    if response_format is not None:
+        try:
+            response_format.model_validate_json(content)
+        except Exception as exc:
+            raise LLMResponseError(
+                f"LLM returned invalid structured output (finish_reason={finish_reason or 'unknown'}): {exc}"
+            ) from exc
+    return content
+
+
 def _provider_retry_delay(error: Exception) -> float | None:
     """Extract a bounded provider retry hint from common quota messages."""
     match = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)s", str(error), re.IGNORECASE)
@@ -248,17 +285,26 @@ class LLMClient:
                 # Track daily usage
                 self._daily_count += 1
 
-                # Extract text from response
-                content = response.choices[0].message.content
-                if content:
-                    return content.strip()
-                else:
-                    logger.warning("LLM returned empty content")
-                    return ""
+                return _response_content(response, response_format)
 
             except Exception as e:
                 last_exception = e
                 error_str = str(e).lower()
+
+                if isinstance(e, LLMResponseError):
+                    if attempt < max_attempts - 1:
+                        if use_model_pool:
+                            pool_index += 1
+                        logger.warning(
+                            "Invalid response from %s (attempt %s/%s); retrying with %s: %s",
+                            current_model,
+                            attempt + 1,
+                            max_attempts,
+                            gemini_pool[pool_index % len(gemini_pool)] if use_model_pool else current_model,
+                            e,
+                        )
+                        continue
+                    break
 
                 # Check if it's a rate limit / quota error
                 is_rate_limit = any(keyword in error_str for keyword in [

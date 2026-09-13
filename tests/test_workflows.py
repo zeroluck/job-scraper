@@ -85,7 +85,7 @@ def test_scoring_capacity_exceeds_recent_daily_ingestion_without_overlapping_run
     assert step["env"]["JOB_SCORE_DRAIN_BACKLOG"] == "${{ inputs.drain_backlog || 'false' }}"
     assert score["jobs"]["score"]["timeout-minutes"] == 360
     assert triggers(score)["schedule"] == [{
-        "cron": "0 2,5,8,23 * * *",
+        "cron": "37 2,5,8,23 * * *",
         "timezone": "America/New_York",
     }]
 
@@ -112,7 +112,7 @@ def test_hourly_pipeline_serializes_runs_and_preserves_manual_lookback():
 
     assert workflow["name"] == "Hourly Job Publication Pipeline"
     assert triggers(workflow)["schedule"] == [{
-        "cron": "5 0,9-21 * * *",
+        "cron": "23 0,9-21 * * *",
         "timezone": "America/New_York",
     }]
     assert triggers(workflow)["workflow_dispatch"]["inputs"]["lookback_hours"]["default"] == "48"
@@ -196,13 +196,13 @@ def test_timezone_schedule_preserves_wall_clock_hours_across_dst():
     schedule = triggers(load_workflow("scrape_jobs.yml"))["schedule"][0]
 
     assert schedule["timezone"] == "America/New_York"
-    assert schedule["cron"] == "5 0,9-21 * * *"
+    assert schedule["cron"] == "23 0,9-21 * * *"
     eastern = ZoneInfo(schedule["timezone"])
-    winter = datetime(2025, 1, 15, 21, 5, tzinfo=eastern)
-    summer = datetime(2025, 7, 15, 21, 5, tzinfo=eastern)
+    winter = datetime(2025, 1, 15, 21, 23, tzinfo=eastern)
+    summer = datetime(2025, 7, 15, 21, 23, tzinfo=eastern)
     assert winter.utcoffset() != summer.utcoffset()
-    assert (winter.hour, winter.minute) == (21, 5)
-    assert (summer.hour, summer.minute) == (21, 5)
+    assert (winter.hour, winter.minute) == (21, 23)
+    assert (summer.hour, summer.minute) == (21, 23)
 
 
 def test_freehire_recovery_is_manual_batched_and_dry_run_by_default():

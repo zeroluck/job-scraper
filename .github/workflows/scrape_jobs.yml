@@ -2,7 +2,7 @@ name: Hourly Job Publication Pipeline
 
 on:
   schedule:
-    - cron: "5 0,9-21 * * *"
+    - cron: "23 0,9-21 * * *"
       timezone: "America/New_York"
   workflow_dispatch:
     inputs:

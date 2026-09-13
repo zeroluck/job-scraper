@@ -34,7 +34,7 @@ def test_get_resume_score_uses_job_scoring_client_without_reasoning(monkeypatch)
     assert result == 87
     assert calls[0]["reasoning_effort"] == "low"
     assert "temperature" not in calls[0]
-    assert calls[0]["max_tokens"] == 16
+    assert calls[0]["max_tokens"] == 64
     assert calls[0]["max_api_attempts"] == 2
 
 
@@ -44,7 +44,7 @@ def test_batch_scoring_returns_only_requested_valid_jobs(monkeypatch):
     class FakeClient:
         def generate_content(self, **kwargs):
             assert kwargs["response_format"] is score_jobs.JobScoreResultList
-            assert kwargs["max_tokens"] == 1000
+            assert kwargs["max_tokens"] == 2048
             return json.dumps({"jobs": [
                 {"job_id": "job-1", "score": 87},
                 {"job_id": "unknown", "score": 10},
@@ -188,6 +188,7 @@ def test_main_releases_omitted_score_claim_once(monkeypatch):
     result = score_jobs.main("technology_delivery", run_filter_prepass=False, worker_id="worker")
 
     assert result["initial_failed"] == 1
+    assert result["status"] == "all_failed"
     assert releases == [(('job-1', 'technology_delivery', 'worker'), {"failed": True})]
 
 
@@ -300,6 +301,38 @@ def test_backlog_drain_stops_after_zero_progress(monkeypatch):
     score_jobs.run_scheduled_scoring(db=object(), drain_backlog=True)
 
     assert calls == ["pass"]
+
+
+def test_scoring_exit_code_fails_when_one_lane_makes_no_progress():
+    score_jobs = importlib.import_module("score_jobs")
+
+    assert score_jobs.scoring_result_exit_code({
+        "technology_delivery": {
+            "status": "partial_success",
+            "initial_claimed": 2,
+            "initial_scored": 1,
+            "initial_failed": 1,
+        },
+        "systems_platform_ops": {
+            "status": "all_failed",
+            "initial_claimed": 2,
+            "initial_scored": 0,
+            "initial_failed": 2,
+        },
+    }) == 1
+
+
+def test_scoring_exit_code_allows_partial_progress_in_every_lane():
+    score_jobs = importlib.import_module("score_jobs")
+
+    assert score_jobs.scoring_result_exit_code({
+        "technology_delivery": {
+            "status": "partial_success",
+            "initial_claimed": 2,
+            "initial_scored": 1,
+            "initial_failed": 1,
+        },
+    }) == 0
 
 
 def test_get_top_scored_jobs_to_apply_excludes_filtered_jobs(monkeypatch):
