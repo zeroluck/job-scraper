@@ -75,6 +75,13 @@ def _provider_retry_delay(error: Exception) -> float | None:
         return None
     return min(60.0, max(0.0, float(match.group(1))))
 
+
+def _is_daily_quota_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return any(token in text for token in (
+        "requestsperday", "requests_per_day", "requests per day", "perday"
+    ))
+
 # Suppress litellm's verbose logging unless DEBUG is set
 litellm.suppress_debug_info = True
 if os.environ.get("LLM_DEBUG", "").lower() == "true":
@@ -149,6 +156,7 @@ class LLMClient:
         self.model_chain = model_chain
         self.last_model_used = None
         self.rate_limiter = RateLimiter(max_rpm)
+        self._model_cooldowns: dict[str, float] = {}
 
         # Daily budget tracking
         self._daily_count = 0
@@ -264,6 +272,21 @@ class LLMClient:
             max_attempts = min(max_attempts, max(1, max_api_attempts))
 
         for attempt in range(max_attempts):
+            if use_model_pool:
+                now = time.monotonic()
+                available_index = next(
+                    (
+                        pool_index + offset
+                        for offset in range(len(gemini_pool))
+                        if self._model_cooldowns.get(
+                            gemini_pool[(pool_index + offset) % len(gemini_pool)], 0
+                        ) <= now
+                    ),
+                    None,
+                )
+                if available_index is None:
+                    break
+                pool_index = available_index
             try:
                 # Rate limiting
                 self.rate_limiter.acquire()
@@ -285,7 +308,9 @@ class LLMClient:
                 # Track daily usage
                 self._daily_count += 1
 
-                return _response_content(response, response_format)
+                content = _response_content(response, response_format)
+                self._model_cooldowns.pop(current_model, None)
+                return content
 
             except Exception as e:
                 last_exception = e
@@ -294,6 +319,7 @@ class LLMClient:
                 if isinstance(e, LLMResponseError):
                     if attempt < max_attempts - 1:
                         if use_model_pool:
+                            self._model_cooldowns[current_model] = time.monotonic() + 60
                             pool_index += 1
                         logger.warning(
                             "Invalid response from %s (attempt %s/%s); retrying with %s: %s",
@@ -314,11 +340,14 @@ class LLMClient:
 
                 if is_rate_limit and attempt < max_attempts - 1:
                     if use_model_pool:
+                        retry_delay = _provider_retry_delay(e) or 60.0
+                        self._model_cooldowns[current_model] = (
+                            float("inf")
+                            if _is_daily_quota_error(e)
+                            else time.monotonic() + retry_delay
+                        )
                         pool_index += 1
-                        delay = random.uniform(1, 4) # Short delay when switching models
-                        retry_delay = _provider_retry_delay(e)
-                        if retry_delay is not None:
-                            delay = max(delay, retry_delay)
+                        delay = random.uniform(1, 4)
                         logger.warning(
                             f"Rate limit hit for {current_model}. Switching to next pool model... "
                             f"(attempt {attempt + 1}/{max_attempts}). Retrying in {delay:.1f}s. Error: {e}"
@@ -326,6 +355,9 @@ class LLMClient:
                     else:
                         # Exponential backoff with jitter
                         delay = self.retry_base_delay * (2 ** attempt) + random.uniform(0, 5)
+                        retry_delay = _provider_retry_delay(e)
+                        if retry_delay is not None:
+                            delay = max(delay, retry_delay)
                         logger.warning(
                             f"Rate limit hit (attempt {attempt + 1}/{max_attempts}). "
                             f"Retrying in {delay:.1f}s... Error: {e}"
@@ -348,7 +380,9 @@ class LLMClient:
             type(last_exception).__name__,
             last_exception,
         )
-        raise last_exception
+        if last_exception is not None:
+            raise last_exception
+        raise RuntimeError("All configured LLM models are cooling down after quota errors")
 
 
 def _create_client(

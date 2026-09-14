@@ -68,6 +68,35 @@ def test_generate_content_honors_provider_retry_hint(monkeypatch):
     monkeypatch.setattr(llm_client.random, "uniform", lambda *_args: 1.0)
     monkeypatch.setattr(llm_client.time, "sleep", lambda seconds: sleeps.append(seconds))
     client = llm_client.LLMClient(
+        model="openai/test",
+        api_key="test-key",
+        max_rpm=100,
+        max_retries=1,
+        retry_base_delay=0,
+        daily_budget=0,
+        request_delay=0,
+    )
+
+    assert client.generate_content(prompt="hello") == "ok"
+    assert sleeps == [27.5]
+
+
+def test_generate_content_skips_daily_exhausted_model_across_calls(monkeypatch):
+    calls = []
+
+    def fake_completion(**kwargs):
+        calls.append(kwargs["model"])
+        if kwargs["model"] == "gemini/first":
+            raise RuntimeError(
+                "429 GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+            )
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
+        )
+
+    monkeypatch.setattr(llm_client.litellm, "completion", fake_completion)
+    monkeypatch.setattr(llm_client.time, "sleep", lambda *_args, **_kwargs: None)
+    client = llm_client.LLMClient(
         model="gemini",
         api_key="test-key",
         max_rpm=100,
@@ -78,8 +107,9 @@ def test_generate_content_honors_provider_retry_hint(monkeypatch):
         model_chain=["gemini/first", "gemini/second"],
     )
 
-    assert client.generate_content(prompt="hello") == "ok"
-    assert sleeps == [27.5]
+    assert client.generate_content(prompt="first") == "ok"
+    assert client.generate_content(prompt="second") == "ok"
+    assert calls == ["gemini/first", "gemini/second", "gemini/second"]
 
 
 def test_generate_content_forwards_reasoning_effort(monkeypatch):
