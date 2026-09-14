@@ -133,6 +133,7 @@ class LLMClient:
         retry_base_delay: int = 10,
         daily_budget: int = 0,
         request_delay: float = 0,
+        request_timeout: float = 120,
         model_chain: Optional[list[str]] = None,
     ):
         """
@@ -153,10 +154,12 @@ class LLMClient:
         self.retry_base_delay = retry_base_delay
         self.daily_budget = daily_budget
         self.request_delay = request_delay
+        self.request_timeout = request_timeout
         self.model_chain = model_chain
         self.last_model_used = None
         self.rate_limiter = RateLimiter(max_rpm)
         self._model_cooldowns: dict[str, float] = {}
+        self._last_pool_error: Exception | None = None
 
         # Daily budget tracking
         self._daily_count = 0
@@ -238,7 +241,7 @@ class LLMClient:
         messages.append({"role": "user", "content": prompt})
 
         # Build base kwargs for litellm.completion
-        base_kwargs = {"messages": messages}
+        base_kwargs = {"messages": messages, "timeout": self.request_timeout}
 
         if temperature is not None:
             base_kwargs["temperature"] = temperature
@@ -285,7 +288,9 @@ class LLMClient:
                     None,
                 )
                 if available_index is None:
-                    break
+                    if self._last_pool_error is not None:
+                        raise self._last_pool_error
+                    raise RuntimeError("All configured LLM models are cooling down")
                 pool_index = available_index
             try:
                 # Rate limiting
@@ -317,9 +322,11 @@ class LLMClient:
                 error_str = str(e).lower()
 
                 if isinstance(e, LLMResponseError):
+                    if use_model_pool:
+                        self._model_cooldowns[current_model] = time.monotonic() + 60
+                        self._last_pool_error = e
                     if attempt < max_attempts - 1:
                         if use_model_pool:
-                            self._model_cooldowns[current_model] = time.monotonic() + 60
                             pool_index += 1
                         logger.warning(
                             "Invalid response from %s (attempt %s/%s); retrying with %s: %s",
@@ -332,24 +339,29 @@ class LLMClient:
                         continue
                     break
 
-                # Check if it's a rate limit / quota error
-                is_rate_limit = any(keyword in error_str for keyword in [
+                is_transient = any(keyword in error_str for keyword in [
                     "429", "rate_limit", "rate limit", "resource_exhausted",
-                    "quota", "too many requests", "retry", "high demand", "503"
+                    "quota", "too many requests", "retry", "high demand", "500",
+                    "502", "503", "504", "timeout", "timed out", "connection error",
+                    "server disconnected", "service unavailable", "internalservererror",
+                    "apiconnectionerror",
                 ])
 
-                if is_rate_limit and attempt < max_attempts - 1:
+                if is_transient and use_model_pool:
+                    retry_delay = _provider_retry_delay(e) or 60.0
+                    self._model_cooldowns[current_model] = (
+                        float("inf")
+                        if _is_daily_quota_error(e)
+                        else time.monotonic() + retry_delay
+                    )
+                    self._last_pool_error = e
+
+                if is_transient and attempt < max_attempts - 1:
                     if use_model_pool:
-                        retry_delay = _provider_retry_delay(e) or 60.0
-                        self._model_cooldowns[current_model] = (
-                            float("inf")
-                            if _is_daily_quota_error(e)
-                            else time.monotonic() + retry_delay
-                        )
                         pool_index += 1
                         delay = random.uniform(1, 4)
                         logger.warning(
-                            f"Rate limit hit for {current_model}. Switching to next pool model... "
+                            f"Transient provider error for {current_model}. Switching to next pool model... "
                             f"(attempt {attempt + 1}/{max_attempts}). Retrying in {delay:.1f}s. Error: {e}"
                         )
                     else:
@@ -359,13 +371,12 @@ class LLMClient:
                         if retry_delay is not None:
                             delay = max(delay, retry_delay)
                         logger.warning(
-                            f"Rate limit hit (attempt {attempt + 1}/{max_attempts}). "
+                            f"Transient provider error (attempt {attempt + 1}/{max_attempts}). "
                             f"Retrying in {delay:.1f}s... Error: {e}"
                         )
                     time.sleep(delay)
                     continue
-                elif not is_rate_limit:
-                    # Non-rate-limit error — don't retry
+                elif not is_transient:
                     logger.error(f"LLM API error (non-retryable) on model {current_model if 'current_model' in locals() else model}: {e}")
                     raise
 
@@ -382,7 +393,7 @@ class LLMClient:
         )
         if last_exception is not None:
             raise last_exception
-        raise RuntimeError("All configured LLM models are cooling down after quota errors")
+        raise RuntimeError("All configured LLM models are cooling down")
 
 
 def _create_client(
@@ -399,6 +410,7 @@ def _create_client(
         retry_base_delay=config.LLM_RETRY_BASE_DELAY,
         daily_budget=config.LLM_DAILY_REQUEST_BUDGET,
         request_delay=config.LLM_REQUEST_DELAY_SECONDS,
+        request_timeout=config.LLM_REQUEST_TIMEOUT_SECONDS,
         model_chain=model_chain,
     )
 

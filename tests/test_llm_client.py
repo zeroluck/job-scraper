@@ -137,6 +137,7 @@ def test_generate_content_forwards_reasoning_effort(monkeypatch):
 
     assert result == "42"
     assert calls[0]["reasoning_effort"] == "medium"
+    assert calls[0]["timeout"] == 120
 
 
 def test_generate_content_omits_reasoning_effort_for_gemma_fallback(monkeypatch):
@@ -257,6 +258,35 @@ def test_generate_content_retries_empty_content_on_next_model(monkeypatch):
 
     assert client.generate_content(prompt="hello") == "ok"
     assert [call["model"] for call in calls] == ["gemini/first", "gemini/second"]
+
+
+def test_generate_content_cools_down_transiently_disconnected_model(monkeypatch):
+    calls = []
+
+    def fake_completion(**kwargs):
+        calls.append(kwargs["model"])
+        if kwargs["model"] == "gemini/first":
+            raise RuntimeError("APIConnectionError: server disconnected")
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
+        )
+
+    monkeypatch.setattr(llm_client.litellm, "completion", fake_completion)
+    monkeypatch.setattr(llm_client.time, "sleep", lambda *_args, **_kwargs: None)
+    client = llm_client.LLMClient(
+        model="gemini",
+        api_key="test-key",
+        max_rpm=100,
+        max_retries=0,
+        retry_base_delay=0,
+        daily_budget=0,
+        request_delay=0,
+        model_chain=["gemini/first", "gemini/second"],
+    )
+
+    assert client.generate_content(prompt="first") == "ok"
+    assert client.generate_content(prompt="second") == "ok"
+    assert calls == ["gemini/first", "gemini/second", "gemini/second"]
 
 
 def test_generate_content_rejects_truncated_finish_reason(monkeypatch):
