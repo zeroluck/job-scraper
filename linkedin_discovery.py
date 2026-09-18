@@ -26,6 +26,7 @@ from linkedin_source_policy import (
     LinkedInCircuitOpen,
     LinkedInGrantRejected,
     LinkedInRequestDeadlineExceeded,
+    is_linkedin_challenge,
 )
 
 
@@ -146,20 +147,6 @@ def adaptive_options(settings: Any) -> dict[str, int]:
     }
 
 
-def _is_challenge(response: requests.Response) -> bool:
-    if response.status_code in (403, 999):
-        return True
-    parsed = urlparse(str(response.url or ""))
-    text = (response.text or "")[:2000].lower()
-    return (
-        "/checkpoint/" in parsed.path
-        or "/challenge/" in parsed.path
-        or "security verification" in text
-        or "id=\"challenge-page\"" in text
-        or "id='challenge-page'" in text
-    )
-
-
 def _retry_after_seconds(response: requests.Response) -> float | None:
     value = response.headers.get("Retry-After")
     if value is None:
@@ -177,7 +164,7 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
 
 
 def classify_search_response(response: requests.Response) -> tuple[str, BeautifulSoup, list[Any]]:
-    if _is_challenge(response):
+    if is_linkedin_challenge(response):
         return "challenge", BeautifulSoup("", "html.parser"), []
     if response.status_code != 200:
         return "http_error", BeautifulSoup("", "html.parser"), []

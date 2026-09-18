@@ -29,6 +29,7 @@ from linkedin_source_policy import (
     DurableLinkedInRequestGate,
     LinkedInCircuitOpen,
     LinkedInGrantRejected,
+    is_linkedin_challenge,
 )
 
 # --- Setup Logging ---
@@ -478,7 +479,7 @@ def _fetch_linkedin_job_ids(
                         "search", f"legacy:{search_query}:{location}:{start}:{retries}"
                     )
                 res = requests.get(target_url, headers=headers, timeout=config.REQUEST_TIMEOUT)
-                if _linkedin_response_is_challenge(res):
+                if is_linkedin_challenge(res):
                     if durable_gate is not None and grant is not None:
                         durable_gate.open_circuit(
                             grant, "LinkedIn denied or challenged legacy search", res.status_code
@@ -631,20 +632,6 @@ def _retry_after_seconds(response) -> float | None:
         return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
 
 
-def _linkedin_response_is_challenge(response) -> bool:
-    if getattr(response, "status_code", None) in (403, 999):
-        return True
-    url = str(getattr(response, "url", "") or "").lower()
-    if "/checkpoint/" in url or "/challenge/" in url:
-        return True
-    text = (getattr(response, "text", "") or "")[:2_000].lower()
-    return (
-        "<title>security verification" in text
-        or 'id="challenge-page"' in text
-        or "id='challenge-page'" in text
-    )
-
-
 def _fetch_linkedin_job_details(
     job_id: str,
     search_card: dict | None = None,
@@ -697,7 +684,7 @@ def _fetch_linkedin_job_details(
                     request_timeout, max(0.1, deadline - time.monotonic())
                 )
             resp = requests.get(job_detail_url, headers=headers, timeout=request_timeout)
-            if _linkedin_response_is_challenge(resp):
+            if is_linkedin_challenge(resp):
                 if durable_gate is not None and grant is not None:
                     durable_gate.open_circuit(
                         grant,

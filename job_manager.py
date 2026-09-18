@@ -9,7 +9,11 @@ import logging
 import config
 import user_agents
 from supabase_utils import supabase # Use the initialized Supabase client
-from linkedin_source_policy import DurableLinkedInRequestGate, LinkedInCircuitOpen
+from linkedin_source_policy import (
+    DurableLinkedInRequestGate,
+    LinkedInCircuitOpen,
+    is_linkedin_challenge,
+)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -66,9 +70,7 @@ async def _check_single_linkedin_job_active(job_id: str, client: httpx.AsyncClie
                 logging.info(f"Job {job_id} returned 404. Marking as inactive.")
                 return True
 
-            response_text_lower = response.text.lower()
-            response_url = str(response.url or "").lower()
-            if response.status_code in (403, 999) or "/checkpoint/" in response_url or "/challenge/" in response_url or "security verification" in response_text_lower:
+            if is_linkedin_challenge(response):
                 await asyncio.to_thread(
                     _linkedin_request_gate.open_circuit,
                     grant,

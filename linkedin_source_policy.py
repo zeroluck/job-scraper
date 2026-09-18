@@ -4,7 +4,9 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
+from bs4 import BeautifulSoup
 import supabase_utils
 
 
@@ -18,6 +20,38 @@ class LinkedInGrantRejected(RuntimeError):
 
 class LinkedInRequestDeadlineExceeded(TimeoutError):
     pass
+
+
+def is_linkedin_challenge(response: Any) -> bool:
+    status_code = getattr(response, "status_code", None)
+    if status_code in (403, 999):
+        return True
+
+    url = str(getattr(response, "url", "") or "")
+    path = urlparse(url).path.lower()
+    if "/checkpoint/" in path or "/challenge/" in path:
+        return True
+
+    headers = getattr(response, "headers", {}) or {}
+    if str(headers.get("cf-mitigated", "")).lower() == "challenge":
+        return True
+
+    text = getattr(response, "text", "") or ""
+    if not text:
+        return False
+    soup = BeautifulSoup(text[:8_192], "html.parser")
+    title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
+    if title in {
+        "security verification",
+        "security verification | linkedin",
+        "security verification - linkedin",
+    }:
+        return True
+    if soup.find(id="challenge-page"):
+        return True
+    return soup.find("form", action=lambda value: value and (
+        "/checkpoint/" in value.lower() or "/challenge/" in value.lower()
+    )) is not None
 
 
 @dataclass(frozen=True)

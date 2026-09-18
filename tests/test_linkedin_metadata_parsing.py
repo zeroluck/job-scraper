@@ -7,7 +7,11 @@ import pytest
 import requests
 
 import scraper
-from linkedin_source_policy import ConsumedGrant, LinkedInCircuitOpen
+from linkedin_source_policy import (
+    ConsumedGrant,
+    LinkedInCircuitOpen,
+    is_linkedin_challenge,
+)
 
 
 def _disable_relist_tracking(monkeypatch):
@@ -146,15 +150,33 @@ def test_retry_after_supports_delta_seconds_and_http_date():
 
 
 def test_linkedin_challenge_detection_covers_denial_status_and_body():
-    assert scraper._linkedin_response_is_challenge(
-        type("Response", (), {"status_code": 403, "text": ""})()
+    assert is_linkedin_challenge(
+        type("Response", (), {"status_code": 403, "text": "", "url": ""})()
     )
-    assert scraper._linkedin_response_is_challenge(
+    assert is_linkedin_challenge(
         type("Response", (), {"status_code": 200, "text": "<title>Security Verification</title>", "url": ""})()
     )
-    assert not scraper._linkedin_response_is_challenge(
+    assert is_linkedin_challenge(
+        type("Response", (), {"status_code": 200, "text": '<div id="challenge-page"></div>', "url": ""})()
+    )
+    assert not is_linkedin_challenge(
         type("Response", (), {"status_code": 200, "text": "Security verification engineer", "url": ""})()
     )
+
+
+def test_linkedin_challenge_detection_ignores_job_description_phrase():
+    response = type("Response", (), {
+        "status_code": 200,
+        "text": (
+            '<section class="top-card-layout">'
+            "specific customer contracts may impose additional security verification "
+            "requirements."
+            "</section>"
+        ),
+        "url": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4439330411",
+    })()
+
+    assert not is_linkedin_challenge(response)
 
 
 def test_search_request_failure_aborts_required_coverage(monkeypatch):
