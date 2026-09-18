@@ -22,23 +22,25 @@ class LinkedInRequestDeadlineExceeded(TimeoutError):
     pass
 
 
-def is_linkedin_challenge(response: Any) -> bool:
+def linkedin_challenge_evidence(response: Any) -> str | None:
     status_code = getattr(response, "status_code", None)
     if status_code in (403, 999):
-        return True
+        return f"http_status={status_code}"
 
     url = str(getattr(response, "url", "") or "")
     path = urlparse(url).path.lower()
-    if "/checkpoint/" in path or "/challenge/" in path:
-        return True
+    if "/checkpoint/" in path:
+        return "final_url_checkpoint"
+    if "/challenge/" in path:
+        return "final_url_challenge"
 
     headers = getattr(response, "headers", {}) or {}
     if str(headers.get("cf-mitigated", "")).lower() == "challenge":
-        return True
+        return "cf_mitigated_challenge"
 
     text = getattr(response, "text", "") or ""
     if not text:
-        return False
+        return None
     soup = BeautifulSoup(text[:8_192], "html.parser")
     title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
     if title in {
@@ -46,12 +48,18 @@ def is_linkedin_challenge(response: Any) -> bool:
         "security verification | linkedin",
         "security verification - linkedin",
     }:
-        return True
+        return f"challenge_title={title!r}"
     if soup.find(id="challenge-page"):
-        return True
-    return soup.find("form", action=lambda value: value and (
+        return "challenge_page_element"
+    if soup.find("form", action=lambda value: value and (
         "/checkpoint/" in value.lower() or "/challenge/" in value.lower()
-    )) is not None
+    )) is not None:
+        return "challenge_form_action"
+    return None
+
+
+def is_linkedin_challenge(response: Any) -> bool:
+    return linkedin_challenge_evidence(response) is not None
 
 
 @dataclass(frozen=True)

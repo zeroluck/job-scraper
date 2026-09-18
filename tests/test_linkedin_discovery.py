@@ -623,3 +623,84 @@ def test_cycle_replay_uses_persisted_window(monkeypatch):
     )
 
     assert result.cycle_id == 3
+
+
+def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
+    execution = SimpleNamespace(
+        lane=SimpleNamespace(archetype="technology_delivery"),
+        query=SimpleNamespace(
+            query="TPM", query_type=SimpleNamespace(value="precision"),
+            language="en", query_id="q1",
+        ),
+        geography=SimpleNamespace(
+            location="Canada", location_scope=SimpleNamespace(value="canada"),
+            geography_id="CA", geo_id=None,
+        ),
+    )
+    configuration = SimpleNamespace(
+        revision=1,
+        settings=SimpleNamespace(
+            lookback_days=2,
+            max_pages_per_query=3,
+            max_jobs_per_query=25,
+            options={},
+        ),
+    )
+    failures = []
+    monkeypatch.setattr(
+        linkedin_discovery.supabase_utils,
+        "get_resumable_linkedin_discovery_cycle",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        linkedin_discovery.supabase_utils,
+        "prepare_linkedin_discovery_scope_state",
+        lambda _keys, _floor: {"states": {}, "debt": {}},
+    )
+    monkeypatch.setattr(
+        linkedin_discovery, "configuration_hash", lambda _configuration: "a" * 64,
+    )
+    monkeypatch.setattr(
+        linkedin_discovery.supabase_utils,
+        "create_linkedin_discovery_cycle",
+        lambda **kwargs: {
+            "cycle_id": 7,
+            "discovery_sequence": 8,
+            "search_status": "running",
+            "scopes": [{
+                "scope_key": kwargs["scopes"][0]["scope_key"],
+                "ingestion_run_id": "run-1",
+                "next_page": 1,
+                "status": "running",
+            }],
+        },
+    )
+    monkeypatch.setattr(
+        linkedin_discovery,
+        "_request_page",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            LinkedInCircuitOpen("http_status=999")
+        ),
+    )
+    monkeypatch.setattr(
+        linkedin_discovery.supabase_utils,
+        "fail_linkedin_discovery_cycle",
+        lambda *args: failures.append(args),
+    )
+    monkeypatch.setattr(
+        linkedin_discovery, "_drain_tasks", lambda *_args, **_kwargs: [])
+
+    with pytest.raises(
+        linkedin_discovery.LinkedInDiscoveryInterrupted,
+        match=r"cycle_id=7 remains resumable.*http_status=999",
+    ):
+        linkedin_discovery.run_discovery(
+            configuration,
+            [execution],
+            parse_cards=lambda _elements: [],
+            detail_fetch=lambda *_args: None,
+            save_details=lambda *_args: None,
+            partial=False,
+        )
+
+    assert failures == []

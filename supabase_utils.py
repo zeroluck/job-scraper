@@ -1818,6 +1818,25 @@ def open_linkedin_source_circuit(
     return value
 
 
+def reset_linkedin_source_circuit(
+    actor: str,
+    reason: str,
+    *,
+    db: Any = None,
+) -> bool:
+    client = db or supabase
+    response = client.rpc("reset_linkedin_source_circuit", {
+        "p_actor": actor,
+        "p_reason": reason[:1000],
+    }).execute()
+    value = response.data
+    if isinstance(value, list) and len(value) == 1:
+        value = value[0]
+    if not isinstance(value, bool):
+        raise RuntimeError("reset_linkedin_source_circuit returned an invalid response")
+    return value
+
+
 def claim_linkedin_discovery_tasks(
     worker_id: str,
     *,

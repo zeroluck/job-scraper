@@ -13,6 +13,7 @@ from linkedin_source_policy import (
     DurableLinkedInRequestGate,
     LinkedInCircuitOpen,
     is_linkedin_challenge,
+    linkedin_challenge_evidence,
 )
 
 # --- Setup Logging ---
@@ -71,13 +72,19 @@ async def _check_single_linkedin_job_active(job_id: str, client: httpx.AsyncClie
                 return True
 
             if is_linkedin_challenge(response):
+                evidence = linkedin_challenge_evidence(response)
+                source_error = (
+                    "LinkedIn activity check interrupted "
+                    f"job_id={job_id} status={response.status_code} "
+                    f"final_url={response.url} evidence={evidence}"
+                )
                 await asyncio.to_thread(
                     _linkedin_request_gate.open_circuit,
                     grant,
-                    f"LinkedIn denied or challenged activity check for {job_id}",
+                    source_error,
                     response.status_code,
                 )
-                raise LinkedInCircuitOpen("LinkedIn denied or challenged activity checks")
+                raise LinkedInCircuitOpen(source_error)
 
             # Check for other non-successful status codes (could indicate removal, private, etc.)
             # Allow redirects (3xx) as httpx handles them by default with follow_redirects=True

@@ -11,6 +11,7 @@ from linkedin_source_policy import (
     ConsumedGrant,
     LinkedInCircuitOpen,
     is_linkedin_challenge,
+    linkedin_challenge_evidence,
 )
 
 
@@ -177,6 +178,16 @@ def test_linkedin_challenge_detection_ignores_job_description_phrase():
     })()
 
     assert not is_linkedin_challenge(response)
+
+
+def test_linkedin_challenge_evidence_reports_the_trigger():
+    response = type("Response", (), {
+        "status_code": 999,
+        "text": "",
+        "url": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/123",
+    })()
+
+    assert linkedin_challenge_evidence(response) == "http_status=999"
 
 
 def test_search_request_failure_aborts_required_coverage(monkeypatch):

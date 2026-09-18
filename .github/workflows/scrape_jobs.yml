@@ -17,6 +17,11 @@ on:
         required: false
         default: ""
         type: string
+      reset_linkedin_circuit:
+        description: "Close an open circuit after verifying its trigger was a false positive"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: linkedin-freehire-pipeline
@@ -55,6 +60,18 @@ jobs:
         run: |
           echo "LINKEDIN_RECOVERY_LOOKBACK_HOURS=${REQUESTED_LOOKBACK_HOURS}" >> "$GITHUB_ENV"
           echo "Requested recovery lookback: ${REQUESTED_LOOKBACK_HOURS}h"
+      - name: Reset verified false-positive LinkedIn circuit
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_linkedin_circuit }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: >-
+          python -c "import supabase_utils;
+          changed = supabase_utils.reset_linkedin_source_circuit(
+          'github-actions:${{ github.run_id }}',
+          'Verified false-positive challenge detector; reset for diagnostic retry');
+          print(f'LinkedIn source circuit reset: {changed}');
+          raise SystemExit(0 if changed else 1)"
       - name: Run scraper script
         id: scraper
         env:

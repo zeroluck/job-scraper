@@ -27,6 +27,7 @@ from linkedin_source_policy import (
     LinkedInGrantRejected,
     LinkedInRequestDeadlineExceeded,
     is_linkedin_challenge,
+    linkedin_challenge_evidence,
 )
 
 
@@ -48,6 +49,10 @@ class DiscoveryError(RuntimeError):
 
 
 class RetryableDiscoveryInterruption(DiscoveryError):
+    pass
+
+
+class LinkedInDiscoveryInterrupted(DiscoveryError):
     pass
 
 
@@ -271,8 +276,13 @@ def _request_page(
             )
             kind, _soup, elements = classify_search_response(response)
             if kind == "challenge":
-                gate.open_circuit(grant, "LinkedIn denied or challenged search access", response.status_code)
-                raise LinkedInCircuitOpen("LinkedIn denied or challenged search access")
+                source_error = (
+                    "LinkedIn search interrupted "
+                    f"status={response.status_code} final_url={response.url} "
+                    f"evidence={linkedin_challenge_evidence(response)}"
+                )
+                gate.open_circuit(grant, source_error, response.status_code)
+                raise LinkedInCircuitOpen(source_error)
             if kind == "http_error":
                 gate.finish(grant, "http_error", response.status_code)
                 if response.status_code == 429 or 500 <= response.status_code < 600:
@@ -735,6 +745,7 @@ def run_discovery(
                 scope["status"] = "complete"
         search_deadline = run_started + options["search_runtime"]
         search_interrupted = False
+        interruption_reason = None
         while (
             physical_attempts[0] < options["attempts"]
             and time.monotonic() < search_deadline
@@ -759,6 +770,7 @@ def run_discovery(
                         exc,
                     )
                     search_interrupted = True
+                    interruption_reason = str(exc)
                     break
                 made_progress = True
                 if scope["status"] == "exhausted":
@@ -790,6 +802,12 @@ def run_discovery(
     except Exception as exc:
         supabase_utils.fail_linkedin_discovery_cycle(cycle_id, str(exc))
         raise
+
+    if search_interrupted:
+        raise LinkedInDiscoveryInterrupted(
+            f"LinkedIn discovery interrupted; cycle_id={cycle_id} remains resumable; "
+            f"reason={interruption_reason}"
+        )
 
     saved = _drain_tasks(
         cycle_id,
