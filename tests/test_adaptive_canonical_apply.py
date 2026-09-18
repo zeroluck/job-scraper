@@ -291,6 +291,7 @@ class RpcSequence:
 def test_ambiguous_transport_retry_reuses_the_exact_application(monkeypatch):
     monkeypatch.setattr(supabase_utils.config, "ENABLE_REPOST_DEDUP", True)
     monkeypatch.setattr(supabase_utils.config, "ENABLE_LINKEDIN_RELIST_TRACKING", True)
+    monkeypatch.setattr(supabase_utils.time, "sleep", lambda _seconds: None)
     db = RpcSequence([
         httpx.ReadTimeout("timed out"),
         {"outcome": "applied", "canonical_job_id": "source-1", "canonical_revision": 0, "provider_candidate_set_revision": NEXT_PROVIDER_REVISION},
@@ -313,8 +314,13 @@ def test_ambiguous_transport_retry_reuses_the_exact_application(monkeypatch):
 def test_ambiguous_transport_failure_is_typed_and_does_not_mutate_context(monkeypatch):
     monkeypatch.setattr(supabase_utils.config, "ENABLE_REPOST_DEDUP", True)
     monkeypatch.setattr(supabase_utils.config, "ENABLE_LINKEDIN_RELIST_TRACKING", True)
+    monkeypatch.setattr(supabase_utils.time, "sleep", lambda _seconds: None)
     context = empty_context()
-    db = RpcSequence([httpx.ReadTimeout("first"), httpx.ReadTimeout("second")])
+    db = RpcSequence([
+        httpx.ReadTimeout("first"),
+        httpx.ReadTimeout("second"),
+        httpx.ReadTimeout("third"),
+    ])
 
     with pytest.raises(supabase_utils.CanonicalTaskApplyAmbiguous):
         supabase_utils.apply_linkedin_discovery_task_canonical(
@@ -327,6 +333,23 @@ def test_ambiguous_transport_failure_is_typed_and_does_not_mutate_context(monkey
         )
 
     assert context.candidates_by_provider["linkedin"] == []
+
+
+def test_statement_timeout_is_retried_with_the_same_application(monkeypatch):
+    monkeypatch.setattr(supabase_utils.config, "ENABLE_REPOST_DEDUP", True)
+    monkeypatch.setattr(supabase_utils.config, "ENABLE_LINKEDIN_RELIST_TRACKING", True)
+    monkeypatch.setattr(supabase_utils.time, "sleep", lambda _seconds: None)
+    db = RpcSequence([
+        RuntimeError({"code": "57014", "message": "statement timeout"}),
+        {"outcome": "applied", "canonical_job_id": "source-1", "canonical_revision": 0, "provider_candidate_set_revision": NEXT_PROVIDER_REVISION},
+    ])
+
+    assert supabase_utils.apply_linkedin_discovery_task_canonical(
+        task(), "worker-1", job(), run_context=empty_context(),
+        runtime_profile=FILTER_PROFILE, db=db,
+    ) == "source-1"
+    assert len(db.calls) == 2
+    assert db.calls[0][1]["p_application"] == db.calls[1][1]["p_application"]
 
 
 def test_stale_plan_invalidates_snapshot_heartbeats_and_replans(monkeypatch):
@@ -442,6 +465,19 @@ def test_task_lease_sqlstate_is_translated(operation, args):
 
     with pytest.raises(supabase_utils.CanonicalTaskLeaseLost):
         operation(*args, db=db)
+
+
+def test_task_transition_retries_schema_cache_error(monkeypatch):
+    monkeypatch.setattr(supabase_utils.time, "sleep", lambda _seconds: None)
+    db = RpcSequence([
+        RuntimeError({"code": "PGRST002", "message": "schema cache unavailable"}),
+        {"status": "failed_retryable"},
+    ])
+
+    assert supabase_utils.transition_linkedin_discovery_task(
+        7, "worker-1", LEASE_TOKEN, "failed_retryable", db=db
+    ) == {"status": "failed_retryable"}
+    assert len(db.calls) == 2
 
 
 def test_stale_replan_heartbeat_lease_loss_is_typed(monkeypatch):

@@ -1168,11 +1168,15 @@ def _is_ambiguous_canonical_apply_error(error: Exception) -> bool:
     if isinstance(error, (TimeoutError, ConnectionError, httpx.TransportError)):
         return True
     status = getattr(error, "status_code", None)
-    if status in {502, 503, 504, 520}:
+    code = getattr(error, "code", None)
+    if status in {500, 502, 503, 504, 520} or code in {"57014", "PGRST002"}:
         return True
     if error.args and isinstance(error.args[0], Mapping):
         status = error.args[0].get("status") or error.args[0].get("status_code")
-        if status in {502, 503, 504, 520, "502", "503", "504", "520"}:
+        code = error.args[0].get("code")
+        if status in {500, 502, 503, 504, 520, "500", "502", "503", "504", "520"}:
+            return True
+        if code in {"57014", "PGRST002"}:
             return True
     return False
 
@@ -1272,7 +1276,7 @@ def apply_linkedin_discovery_task_canonical(
             runtime_profiles=runtime_profiles,
         )
         response = None
-        for ambiguous_attempt in range(2):
+        for ambiguous_attempt in range(3):
             try:
                 response = client.rpc("apply_linkedin_discovery_task_canonical", {
                     "p_task_id": task_snapshot["id"],
@@ -1292,10 +1296,11 @@ def apply_linkedin_discovery_task_canonical(
                     ) from error
                 if not _is_ambiguous_canonical_apply_error(error):
                     raise
-                if ambiguous_attempt == 1:
+                if ambiguous_attempt == 2:
                     raise CanonicalTaskApplyAmbiguous(
                         "canonical task application outcome is ambiguous"
                     ) from error
+                time.sleep(0.25 * (ambiguous_attempt + 1))
         if response is None:
             raise CanonicalTaskApplyAmbiguous(
                 "canonical task application returned no response"
@@ -1867,21 +1872,25 @@ def transition_linkedin_discovery_task(
     db: Any = None,
 ) -> dict[str, Any]:
     client = db or supabase
-    try:
-        response = client.rpc("transition_linkedin_discovery_task", {
-            "p_task_id": task_id,
-            "p_worker_id": worker_id,
-            "p_lease_token": lease_token,
-            "p_status": status,
-            "p_canonical_job_id": canonical_job_id,
-            "p_error_code": error_code,
-        }).execute()
-    except Exception as error:
-        if _is_canonical_task_lease_error(error):
-            raise CanonicalTaskLeaseLost(
-                "adaptive discovery task lease was lost during transition"
-            ) from error
-        raise
+    for attempt in range(3):
+        try:
+            response = client.rpc("transition_linkedin_discovery_task", {
+                "p_task_id": task_id,
+                "p_worker_id": worker_id,
+                "p_lease_token": lease_token,
+                "p_status": status,
+                "p_canonical_job_id": canonical_job_id,
+                "p_error_code": error_code,
+            }).execute()
+            break
+        except Exception as error:
+            if _is_canonical_task_lease_error(error):
+                raise CanonicalTaskLeaseLost(
+                    "adaptive discovery task lease was lost during transition"
+                ) from error
+            if not _is_ambiguous_canonical_apply_error(error) or attempt == 2:
+                raise
+            time.sleep(0.25 * (attempt + 1))
     return _single_rpc_record(response.data, "transition_linkedin_discovery_task")
 
 
