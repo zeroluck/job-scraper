@@ -463,6 +463,42 @@ def test_extract_keywords_from_batch_defers_provider_quota_exhaustion(monkeypatc
     assert client.calls == 1
 
 
+def test_extract_keywords_from_batch_defers_transient_provider_failure(monkeypatch):
+    class TransientClient:
+        calls = 0
+
+        def generate_content(self, **_kwargs):
+            self.calls += 1
+            raise RuntimeError("503 Service Unavailable: model is experiencing high demand")
+
+    monkeypatch.setattr(analyze_jobs.time, "sleep", lambda _seconds: None)
+    client = TransientClient()
+
+    result = analyze_jobs.extract_keywords_from_batch(
+        [{"job_id": "1", "job_title": "A", "description": "Needs Python"}],
+        client=client,
+        max_retries=2,
+    )
+
+    assert result == {}
+    assert client.calls == 2
+
+
+def test_extract_keywords_from_batch_raises_non_retryable_provider_failure(monkeypatch):
+    class InvalidRequestClient:
+        def generate_content(self, **_kwargs):
+            raise RuntimeError("400 invalid request")
+
+    monkeypatch.setattr(analyze_jobs.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(RuntimeError, match="400 invalid request"):
+        analyze_jobs.extract_keywords_from_batch(
+            [{"job_id": "1", "job_title": "A", "description": "Needs Python"}],
+            client=InvalidRequestClient(),
+            max_retries=2,
+        )
+
+
 def test_fetch_unanalyzed_jobs_retries_statement_timeout(monkeypatch):
     calls = []
 

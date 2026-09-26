@@ -14,6 +14,16 @@ from lane_catalog import canonical_lane_slug
 logger = logging.getLogger(__name__)
 
 VALID_CATEGORIES = {"skill", "technology", "certification", "attribute"}
+QUOTA_ERROR_TOKENS = (
+    "429", "rate limit", "ratelimit", "quota", "resource_exhausted"
+)
+TRANSIENT_PROVIDER_ERROR_TOKENS = (
+    *QUOTA_ERROR_TOKENS,
+    "high demand", "timeout", "timed out", "connection error",
+    "server disconnected", "service unavailable", "internal error",
+    "internalservererror", "apiconnectionerror", "bad gateway",
+    "gateway timeout",
+)
 
 SYSTEM_PROMPT = """You extract high-signal job market keywords from batches of job postings.
 
@@ -62,6 +72,11 @@ def _normalize_keyword(keyword: str) -> str:
 
 def _normalize_category(category: str) -> str:
     return category.strip().lower()
+
+
+def _error_contains(error: Exception, tokens: tuple[str, ...]) -> bool:
+    error_text = str(error).lower()
+    return any(token in error_text for token in tokens)
 
 
 def parse_keyword_response(raw_response: str) -> dict[str, list[KeywordItem]]:
@@ -164,10 +179,7 @@ def extract_keywords_from_batch(batch, client=None, max_retries=None) -> dict[st
             )
         except Exception as exc:
             last_error = exc
-            error_text = str(exc).lower()
-            if any(token in error_text for token in (
-                "429", "rate limit", "ratelimit", "quota", "resource_exhausted"
-            )):
+            if _error_contains(exc, QUOTA_ERROR_TOKENS):
                 break
         logger.warning("Keyword extraction failed on attempt %s: %s", attempt + 1, last_error)
         if attempt < max_retries - 1:
@@ -180,12 +192,9 @@ def extract_keywords_from_batch(batch, client=None, max_retries=None) -> dict[st
         )
         return extracted
     if last_error is not None:
-        error_text = str(last_error).lower()
-        if any(token in error_text for token in (
-            "429", "rate limit", "ratelimit", "quota", "resource_exhausted"
-        )):
+        if _error_contains(last_error, TRANSIENT_PROVIDER_ERROR_TOKENS):
             logger.error(
-                "Deferring keyword analysis after provider quota exhaustion; jobs remain queued."
+                "Deferring keyword analysis after transient provider failure; jobs remain queued."
             )
             return extracted
         raise last_error
