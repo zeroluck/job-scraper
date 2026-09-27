@@ -53,6 +53,32 @@ def _freehire_view_source_columns(sql):
     return identifiers - aliases - {"and", "coalesce", "is", "not", "null", "where"}
 
 
+def test_public_data_api_hardening_is_deny_by_default():
+    sql = (
+        ROOT / "supabase_setup" / "harden_public_data_api.sql"
+    ).read_text().lower()
+    normalized = re.sub(r"\s+", " ", sql)
+
+    assert "drop function if exists public.rmc_reset_database()" in normalized
+    assert (
+        "drop function if exists public.rmc_append_skill_source(text, uuid)"
+        in normalized
+    )
+    for table in ("metro_aliases", "place_province_hints"):
+        assert f"alter table public.{table} enable row level security" in normalized
+    assert "from public, anon, authenticated" in normalized
+    assert "grant select on table" in normalized
+    assert "to service_role" in normalized
+    assert "alter default privileges for role postgres in schema public" in normalized
+    assert "revoke all on tables from public, anon, authenticated" in normalized
+    assert "revoke all on sequences from public, anon, authenticated" in normalized
+    assert (
+        "revoke execute on functions from public, anon, authenticated"
+        in normalized
+    )
+    assert sql.rstrip().endswith("commit;")
+
+
 def test_adaptive_linkedin_migration_has_durable_discovery_barriers():
     sql = (ROOT / "supabase_setup" / "add_adaptive_linkedin_discovery.sql").read_text()
     normalized = re.sub(r"\s+", " ", sql.lower())

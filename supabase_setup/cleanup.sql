@@ -1,5 +1,4 @@
 -- Database Cleanup Script for job-scraper
--- Preserves rmc_* tables (backgrndy/resumemuncher)
 -- Removes job-scraper specific tables and functions
 
 BEGIN;
@@ -100,6 +99,8 @@ DROP FUNCTION IF EXISTS "public"."reject_linkedin_requirement_provenance_change"
 DROP FUNCTION IF EXISTS "public"."transition_linkedin_discovery_task"(bigint, text, uuid, text, text, text) CASCADE;
 DROP FUNCTION IF EXISTS "public"."finalize_freehire_publication_v2"(bigint) CASCADE;
 DROP FUNCTION IF EXISTS "public"."get_linkedin_discovery_status"() CASCADE;
+DROP FUNCTION IF EXISTS "public"."rmc_reset_database"() CASCADE;
+DROP FUNCTION IF EXISTS "public"."rmc_append_skill_source"(text, uuid) CASCADE;
 
 -- Step 4: Drop storage bucket for personalized_resumes
 DELETE FROM storage.objects WHERE bucket_id = 'personalized_resumes';
@@ -111,12 +112,12 @@ DELETE FROM storage.buckets WHERE id = 'personalized_resumes';
 
 COMMIT;
 
--- Verification: List remaining non-rmc tables
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public' AND table_name NOT LIKE 'rmc_%'
+-- Verification: List remaining public tables
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public'
 ORDER BY table_name;
 
--- Verification: List remaining non-rmc functions
-SELECT routine_name FROM information_schema.routines 
-WHERE routine_schema = 'public' AND routine_name NOT LIKE 'rmc_%'
+-- Verification: List remaining public functions
+SELECT routine_name FROM information_schema.routines
+WHERE routine_schema = 'public'
 ORDER BY routine_name;
