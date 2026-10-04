@@ -303,6 +303,34 @@ def test_backlog_drain_stops_after_zero_progress(monkeypatch):
     assert calls == ["pass"]
 
 
+def test_scheduled_scoring_skips_legacy_global_filter_scan(monkeypatch):
+    score_jobs = importlib.import_module("score_jobs")
+    main_calls = []
+    monkeypatch.setattr(score_jobs.config, "LLM_API_KEY", "test-key")
+    monkeypatch.setattr(
+        score_jobs,
+        "main",
+        lambda lane, **kwargs: main_calls.append((lane, kwargs)) or {
+            "initial_claimed": 0,
+            "initial_scored": 0,
+            "rescore_claimed": 0,
+            "rescore_scored": 0,
+        },
+    )
+
+    def fake_run(worker, **_kwargs):
+        return {"lane": worker("technology_delivery")}
+
+    monkeypatch.setattr(score_jobs, "run_configured_scoring", fake_run)
+
+    score_jobs.run_scheduled_scoring(db=object(), drain_backlog=False)
+
+    assert main_calls == [(
+        "technology_delivery",
+        {"run_filter_prepass": False},
+    )]
+
+
 def test_scoring_exit_code_fails_when_one_lane_makes_no_progress():
     score_jobs = importlib.import_module("score_jobs")
 

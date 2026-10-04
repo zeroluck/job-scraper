@@ -88,3 +88,28 @@ def test_lane_claim_database_errors_fail_the_worker(monkeypatch):
         supabase_utils.get_jobs_to_score(1, "data_pm", "score-worker")
     with pytest.raises(RuntimeError, match="database unavailable"):
         supabase_utils.get_jobs_to_rescore(1, "data_pm", "score-worker")
+
+
+def test_scoring_queue_claim_retries_statement_timeout(monkeypatch):
+    class TimeoutThenSuccess(RpcDb):
+        def rpc(self, name, args):
+            self.calls.append((name, args))
+
+            def execute():
+                if len(self.calls) == 1:
+                    raise RuntimeError("57014 canceling statement due to statement timeout")
+                return SimpleNamespace(data=[{"job_id": "job-1"}])
+
+            return SimpleNamespace(execute=execute)
+
+    db = TimeoutThenSuccess()
+    monkeypatch.setattr(supabase_utils, "supabase", db)
+    monkeypatch.setattr(supabase_utils.time, "sleep", lambda _seconds: None)
+
+    assert supabase_utils.get_jobs_to_score(
+        1, "data_pm", "score-worker"
+    ) == [{"job_id": "job-1"}]
+    assert [name for name, _args in db.calls] == [
+        "get_lane_jobs_to_score",
+        "get_lane_jobs_to_score",
+    ]

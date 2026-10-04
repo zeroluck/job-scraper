@@ -2763,10 +2763,24 @@ def get_jobs_to_score(
         if archetype:
             if not worker_id:
                 raise ValueError("worker_id is required for lane scoring claims")
-            response = supabase.rpc("get_lane_jobs_to_score", {
+            rpc_args = {
                 "p_archetype": canonical_lane_slug(archetype), "p_limit": limit,
                 "p_worker_id": worker_id, "p_lease_seconds": lease_seconds,
-            }).execute()
+            }
+            for attempt in range(3):
+                try:
+                    response = supabase.rpc(
+                        "get_lane_jobs_to_score", rpc_args
+                    ).execute()
+                    break
+                except Exception as exc:
+                    if "57014" not in str(exc) or attempt == 2:
+                        raise
+                    logging.warning(
+                        "Scoring queue claim timed out; retrying (%s/3).",
+                        attempt + 1,
+                    )
+                    time.sleep(2 ** attempt)
         else:
             response = supabase.table(config.SUPABASE_TABLE_NAME)\
                                .select("job_id, job_title, company, description, level")\

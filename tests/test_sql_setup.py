@@ -79,6 +79,21 @@ def test_public_data_api_hardening_is_deny_by_default():
     assert sql.rstrip().endswith("commit;")
 
 
+def test_lane_scoring_queue_uses_a_matching_partial_index():
+    sql = (
+        ROOT / "supabase_setup" / "optimize_lane_scoring_queue.sql"
+    ).read_text().lower()
+    normalized = re.sub(r"\s+", " ", sql)
+
+    assert "job_archetype_memberships_score_queue_idx" in normalized
+    assert "(archetype, first_matched_at, job_id)" in normalized
+    assert "where filter_status = 'included' and match_score is null" in normalized
+    assert "order by m.first_matched_at asc, m.job_id asc" in normalized
+    assert "for update of m skip locked" in normalized
+    assert "drop index if exists public.job_archetype_memberships_score_claim_idx" in normalized
+    assert sql.rstrip().endswith("commit;")
+
+
 def test_adaptive_linkedin_migration_has_durable_discovery_barriers():
     sql = (ROOT / "supabase_setup" / "add_adaptive_linkedin_discovery.sql").read_text()
     normalized = re.sub(r"\s+", " ", sql.lower())

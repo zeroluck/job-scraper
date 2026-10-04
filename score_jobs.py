@@ -432,8 +432,8 @@ def main(
     failed_initial_scores = 0
 
     # --- Pre-pass: Flag irrelevant jobs before any LLM scoring ---
-    logging.info("--- Pre-pass: Flagging filtered jobs ---")
     if run_filter_prepass:
+        logging.info("--- Pre-pass: Flagging filtered jobs ---")
         flagged_count = supabase_utils.flag_filtered_jobs()
         logging.info(f"Pre-pass complete. {flagged_count} job(s) newly flagged as filtered.")
 
@@ -558,19 +558,15 @@ def run_scheduled_scoring(
     bypass: callers that need one must invoke ``main(<canonical lane>)`` directly.
     """
     db = db or supabase_utils.supabase
-    prepass_complete = False
 
     def run_lane(lane: str):
-        nonlocal prepass_complete
         if not config.LLM_API_KEY:
             logging.error(
                 "LLM_API_KEY environment variable not set. "
                 "(Also accepts GEMINI_API_KEY / GEMINI_FIRST_API_KEY)"
             )
             return {"status": "skipped_missing_llm_api_key", "archetype": lane}
-        result = main(lane, run_filter_prepass=not prepass_complete)
-        prepass_complete = True
-        return result
+        return main(lane, run_filter_prepass=False)
 
     if drain_backlog is None:
         drain_backlog = os.getenv("JOB_SCORE_DRAIN_BACKLOG", "false").lower() == "true"
