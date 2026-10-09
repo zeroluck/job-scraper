@@ -119,6 +119,7 @@ jobs:
       outcome: ${{ steps.gate.outputs.outcome }}
       requested_cycle_id: ${{ steps.gate.outputs.requested_cycle_id }}
       eligible_cycle_id: ${{ steps.gate.outputs.eligible_cycle_id }}
+      blocking_count: ${{ steps.gate.outputs.blocking_count }}
       published_at: ${{ steps.gate.outputs.published_at }}
       blocking_details: ${{ steps.gate.outputs.blocking_details }}
       row_count: ${{ steps.gate.outputs.row_count }}
@@ -175,7 +176,7 @@ jobs:
             --color B60205 2>/dev/null || true
           OPEN_ISSUE=$(gh issue list --repo "${{ github.repository }}" --label pipeline-gate --state open --json number --jq '.[0].number // empty')
           RUN_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ "$GATE_OUTCOME" = "deferred" ] && [ "${GATE_BLOCKING_COUNT:-0}" != "0" ]; then
+          if [ "$GATE_OUTCOME" = "deferred" ] && [ "${GATE_BLOCKING_COUNT:-1}" != "0" ]; then
             BODY="Publication gate deferred on run <$RUN_LINK>."
             BODY="$BODY Cycle: \`$GATE_CYCLE_ID\`. Blocking: \`$GATE_BLOCKING_COUNT\`."
             BODY="$BODY Details: \`$GATE_BLOCKING_DETAILS\`."
