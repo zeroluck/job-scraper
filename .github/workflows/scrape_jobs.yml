@@ -120,6 +120,7 @@ jobs:
       requested_cycle_id: ${{ steps.gate.outputs.requested_cycle_id }}
       eligible_cycle_id: ${{ steps.gate.outputs.eligible_cycle_id }}
       published_at: ${{ steps.gate.outputs.published_at }}
+      blocking_details: ${{ steps.gate.outputs.blocking_details }}
       row_count: ${{ steps.gate.outputs.row_count }}
       schema_version: ${{ steps.gate.outputs.schema_version }}
     steps:
@@ -139,3 +140,60 @@ jobs:
           --scrape-result "${{ needs.scrape.result }}"
           --freehire-compat-result "${{ needs.freehire_compat.result }}"
           --discovery-cycle-id "${{ needs.scrape.outputs.discovery_cycle_id }}"
+
+  gate_watchdog:
+    # Warn, don't discard: a deferred gate freezes the watermark and every
+    # later run is a no-op until a human reviews the blocking tasks. File (or
+    # refresh) a tracking issue so the stall pages a person instead of only
+    # appearing in hourly logs nobody reads. Closes itself once publishing
+    # resumes. The failing requirement rows stay untouched in the database;
+    # unblocking remains a reviewed accept_linkedin_discovery_requirement call.
+    if: ${{ always() && (inputs.archetype == '' || inputs.archetype == null) }}
+    needs: [publication_gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File or refresh gate-stall issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GATE_OUTCOME: ${{ needs.publication_gate.outputs.outcome }}
+          GATE_BLOCKING_COUNT: ${{ needs.publication_gate.outputs.blocking_count }}
+          GATE_CYCLE_ID: ${{ needs.publication_gate.outputs.requested_cycle_id }}
+          GATE_BLOCKING_DETAILS: ${{ needs.publication_gate.outputs.blocking_details }}
+          GATE_GENERATION: ${{ needs.publication_gate.outputs.generation }}
+        run: |
+          if [ -z "$GATE_OUTCOME" ]; then
+            echo "Gate did not report an outcome; watchdog idle."
+            exit 0
+          fi
+          gh label create pipeline-gate \
+            --description "Deferred publication gate blocking ingestion watermark" \
+            --color B60205 2>/dev/null || true
+          OPEN_ISSUE=$(gh issue list --label pipeline-gate --state open --json number --jq '.[0].number // empty')
+          RUN_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ "$GATE_OUTCOME" = "deferred" ] && [ "${GATE_BLOCKING_COUNT:-0}" != "0" ]; then
+            BODY="Publication gate deferred on run <$RUN_LINK>."
+            BODY="$BODY Cycle: \`$GATE_CYCLE_ID\`. Blocking: \`$GATE_BLOCKING_COUNT\`."
+            BODY="$BODY Details: \`$GATE_BLOCKING_DETAILS\`."
+            BODY="$BODY The watermark is frozen; hourly runs are no-ops until the blocking requirements are reviewed."
+            BODY="$BODY Unblock with a reviewed accept_linkedin_discovery_requirement call (see the gate step summary for the exact statement)."
+            if [ -z "$OPEN_ISSUE" ]; then
+              gh issue create --label pipeline-gate \
+                --title "Publication gate deferred: cycle $GATE_CYCLE_ID blocked" \
+                --body "$BODY"
+            else
+              gh issue comment "$OPEN_ISSUE" --body "Still deferred on run <$RUN_LINK>. $BODY"
+            fi
+          elif [ "$GATE_OUTCOME" = "published" ] || [ "$GATE_OUTCOME" = "unchanged" ]; then
+            if [ -n "$OPEN_ISSUE" ]; then
+              gh issue comment "$OPEN_ISSUE" --body "Gate $GATE_OUTCOME (generation \`$GATE_GENERATION\`) on run <$RUN_LINK>; closing."
+              gh issue close "$OPEN_ISSUE"
+            else
+              echo "Gate $GATE_OUTCOME; no open stall issue."
+            fi
+          else
+            echo "Gate outcome $GATE_OUTCOME needs no watchdog action."
+          fi

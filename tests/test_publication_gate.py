@@ -297,3 +297,156 @@ def test_cycle_publication_deferral_allows_initial_empty_state():
 
     assert publication["outcome"] == "deferred"
     assert publication["source_scrape_watermark"] is None
+
+
+class BlockingTable:
+    def __init__(self, rows):
+        self.rows = rows
+        self.filters = []
+
+    def select(self, _fields):
+        return self
+
+    def eq(self, field, value):
+        self.filters.append((field, value))
+        return self
+
+    def limit(self, _value):
+        return self
+
+    def execute(self):
+        matched = [
+            row for row in self.rows
+            if all(row.get(field) == value for field, value in self.filters)
+        ]
+        return SimpleNamespace(data=matched)
+
+
+class BlockingDb:
+    def __init__(self, requirements, acceptances, tasks):
+        self.requirements = requirements
+        self.acceptances = acceptances
+        self.tasks = tasks
+
+    def table(self, name):
+        return BlockingTable({
+            "linkedin_discovery_requirements": self.requirements,
+            "linkedin_discovery_requirement_acceptances": self.acceptances,
+            "linkedin_discovery_tasks": self.tasks,
+        }[name])
+
+
+def _blocking_fixture():
+    requirements = [
+        {
+            "discovery_cycle_id": 49,
+            "ingestion_run_id": "run-1",
+            "provider": "linkedin",
+            "source_job_id": "4455370040",
+            "task_kind": "initial_detail",
+            "requirement_key": "first",
+            "task_id": 66534,
+            "required": True,
+        },
+        {
+            "discovery_cycle_id": 49,
+            "ingestion_run_id": "run-1",
+            "provider": "linkedin",
+            "source_job_id": "999",
+            "task_kind": "initial_detail",
+            "requirement_key": "first",
+            "task_id": 70000,
+            "required": True,
+        },
+        {
+            "discovery_cycle_id": 49,
+            "ingestion_run_id": "run-1",
+            "provider": "linkedin",
+            "source_job_id": "1000",
+            "task_kind": "initial_detail",
+            "requirement_key": "first",
+            "task_id": 70001,
+            "required": True,
+        },
+    ]
+    acceptances = [
+        {
+            "discovery_cycle_id": 49,
+            "ingestion_run_id": "run-1",
+            "provider": "linkedin",
+            "source_job_id": "999",
+            "task_kind": "initial_detail",
+            "requirement_key": "first",
+        },
+    ]
+    tasks = [
+        {
+            "id": 66534,
+            "status": "failed_terminal",
+            "attempt_count": 5,
+            "max_attempts": 5,
+            "last_error_code": "detail_invalid",
+            "latest_observed_at": "2026-09-30T10:44:43+00:00",
+        },
+        {
+            "id": 70000,
+            "status": "failed_terminal",
+            "attempt_count": 5,
+            "max_attempts": 5,
+            "last_error_code": "detail_invalid",
+            "latest_observed_at": "2026-09-30T10:44:43+00:00",
+        },
+        {
+            "id": 70001,
+            "status": "complete",
+            "attempt_count": 1,
+            "max_attempts": 5,
+            "last_error_code": None,
+            "latest_observed_at": "2026-09-30T10:44:43+00:00",
+        },
+    ]
+    return BlockingDb(requirements, acceptances, tasks)
+
+
+def test_blocking_query_reports_unaccepted_failures_only():
+    blocking = publication_gate.query_blocking_requirements(_blocking_fixture(), 49)
+
+    assert len(blocking) == 1
+    assert blocking[0]["task_id"] == 66534
+    assert blocking[0]["status"] == "failed_terminal"
+    assert blocking[0]["last_error_code"] == "detail_invalid"
+    assert blocking[0]["source_job_id"] == "4455370040"
+
+
+def test_deferral_warning_is_single_line_and_summarized(tmp_path, capsys, monkeypatch):
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    state = {"outcome": "deferred", "reason": "unresolved discovery tasks", "requested_cycle_id": 49}
+
+    details = publication_gate.emit_deferral_warning(_blocking_fixture(), state)
+
+    assert "\n" not in details and "\r" not in details
+    assert "66534" in details and "detail_invalid" in details
+    out = capsys.readouterr().out
+    assert out.startswith("::warning::Publication gate deferred: cycle 49 blocked")
+    summary_text = summary.read_text()
+    assert "## Publication gate deferred" in summary_text
+    assert "accept_linkedin_discovery_requirement" in summary_text
+
+
+def test_deferral_warning_idle_without_deferred_blocking(capsys):
+    assert publication_gate.emit_deferral_warning(_blocking_fixture(), {"outcome": "published"}) == ""
+    assert publication_gate.emit_deferral_warning(
+        _blocking_fixture(),
+        {"outcome": "deferred", "requested_cycle_id": None},
+    ) == ""
+    assert capsys.readouterr().out == ""
+
+
+def test_deferral_warning_never_fails_the_gate(capsys):
+    class BrokenDb:
+        def table(self, _name):
+            raise RuntimeError("db down")
+
+    assert publication_gate.emit_deferral_warning(BrokenDb(), {"outcome": "deferred", "requested_cycle_id": 49}) == ""
+    assert "Gate deferral warning unavailable: db down" in capsys.readouterr().out
