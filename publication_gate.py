@@ -398,17 +398,28 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     for job in PIPELINE_JOBS:
         parser.add_argument(f"--{job.replace('_', '-')}-result", required=True)
-    parser.add_argument("--discovery-cycle-id", type=int, required=True)
+    # Optional at parse time so a failed scrape (which exports no cycle ID)
+    # reports the pipeline failure instead of an argparse usage error.
+    parser.add_argument("--discovery-cycle-id", default="")
     args = parser.parse_args()
     results = {
         "scrape": args.scrape_result,
         "freehire_compat": args.freehire_compat_result,
     }
     verify_pipeline_results(results)
+    try:
+        discovery_cycle_id = int(args.discovery_cycle_id)
+    except (TypeError, ValueError):
+        discovery_cycle_id = None
+    if not discovery_cycle_id or discovery_cycle_id <= 0:
+        raise RuntimeError(
+            "Publication gate blocked: no discovery cycle ID from scrape "
+            f"(scrape={results['scrape']}, freehire_compat={results['freehire_compat']})"
+        )
     db = _get_db()
     state = query_publication_state(db)
     validate_publication_state(state, require_legacy_ready=False)
-    state.update(finalize_publication(db, state, args.discovery_cycle_id))
+    state.update(finalize_publication(db, state, discovery_cycle_id))
     pruned_generations = (
         try_prune_publication_generations(db)
         if state["outcome"] in {"published", "unchanged"}

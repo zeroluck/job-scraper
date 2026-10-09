@@ -246,10 +246,19 @@ def _request_page(
         lookback_seconds = max(1, math.ceil((grant.started_at - anchor).total_seconds()))
         if (maximum_lookback_seconds is not None
                 and lookback_seconds > maximum_lookback_seconds):
-            gate.finish(grant, "window_expired", None)
-            raise DiscoveryError(
-                "persisted discovery window exceeds the supported recovery cap"
+            # Outage gaps leave persisted scope anchors older than the
+            # recovery cap. The manifest records the beyond-cap slice as
+            # expired_window_* coverage debt, so fetch the capped window and
+            # keep the run alive instead of failing it; later deep sweeps
+            # re-cover the expired slice. The truncation stays visible in the
+            # page receipt (lookback_seconds, source_window_earliest_at).
+            logging.warning(
+                "Discovery scope %s window %ss exceeds recovery cap %ss; fetching capped window",
+                scope.get("scope_key"),
+                lookback_seconds,
+                maximum_lookback_seconds,
             )
+            lookback_seconds = maximum_lookback_seconds
         effective_earliest = grant.started_at - timedelta(seconds=lookback_seconds)
         params = {
             "keywords": scope["query"],

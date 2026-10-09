@@ -450,3 +450,23 @@ def test_deferral_warning_never_fails_the_gate(capsys):
 
     assert publication_gate.emit_deferral_warning(BrokenDb(), {"outcome": "deferred", "requested_cycle_id": 49}) == ""
     assert "Gate deferral warning unavailable: db down" in capsys.readouterr().out
+
+
+def test_gate_reports_missing_cycle_id_after_failed_scrape(monkeypatch):
+    import sys
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "publication_gate.py",
+            "--scrape-result",
+            "success",
+            "--freehire-compat-result",
+            "success",
+            "--discovery-cycle-id",
+            "",
+        ],
+    )
+    with pytest.raises(RuntimeError, match="no discovery cycle ID"):
+        publication_gate.main()

@@ -704,3 +704,55 @@ def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
         )
 
     assert failures == []
+
+
+def test_over_cap_window_is_clamped_not_fatal(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    captured = {}
+
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        return SimpleNamespace(status_code=200, content=b"x", url=url)
+
+    monkeypatch.setattr(linkedin_discovery.requests, "get", fake_get)
+    monkeypatch.setattr(
+        linkedin_discovery,
+        "classify_search_response",
+        lambda _response: ("no_results", None, []),
+    )
+
+    finished = []
+
+    class FakeGate:
+        def acquire(self, *args, **kwargs):
+            return SimpleNamespace(started_at=datetime.now(timezone.utc))
+
+        def finish(self, grant, response_class, status):
+            finished.append((response_class, status))
+
+    now = datetime.now(timezone.utc)
+    scope = {
+        "scope_key": "test-scope",
+        "source_window_earliest_at": (now - timedelta(hours=200)).isoformat(),
+        "query": "TPM",
+        "location": "Canada",
+        "job_type": "F",
+        "work_types": "W",
+        "next_page": 1,
+    }
+    page = linkedin_discovery._request_page(
+        scope,
+        1,
+        user_agent="test-agent",
+        gate=FakeGate(),
+        parse_cards=lambda elements: [],
+        physical_attempts=[0],
+        physical_limit=100,
+        maximum_lookback_seconds=48 * 3600,
+        deadline=None,
+    )
+
+    assert page["lookback_seconds"] == 48 * 3600
+    assert "f_TPR=r172800" in captured["url"]
+    assert finished == [("no_results", 200)]
