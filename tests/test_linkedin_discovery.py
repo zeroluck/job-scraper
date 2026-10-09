@@ -706,10 +706,8 @@ def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
     assert failures == []
 
 
-def test_over_cap_window_is_clamped_not_fatal(monkeypatch):
-    from datetime import datetime, timedelta, timezone
-
-    captured = {}
+def _over_cap_gate(monkeypatch, captured, finished):
+    from datetime import datetime, timezone
 
     def fake_get(url, **kwargs):
         captured["url"] = url
@@ -722,8 +720,6 @@ def test_over_cap_window_is_clamped_not_fatal(monkeypatch):
         lambda _response: ("no_results", None, []),
     )
 
-    finished = []
-
     class FakeGate:
         def acquire(self, *args, **kwargs):
             return SimpleNamespace(started_at=datetime.now(timezone.utc))
@@ -731,28 +727,82 @@ def test_over_cap_window_is_clamped_not_fatal(monkeypatch):
         def finish(self, grant, response_class, status):
             finished.append((response_class, status))
 
-    now = datetime.now(timezone.utc)
+    return FakeGate()
+
+
+def _over_cap_scope(now, **extra):
+    from datetime import timedelta
+
     scope = {
         "scope_key": "test-scope",
         "source_window_earliest_at": (now - timedelta(hours=200)).isoformat(),
+        "request_anchor_at": now.isoformat(),
         "query": "TPM",
         "location": "Canada",
         "job_type": "F",
         "work_types": "W",
         "next_page": 1,
     }
+    scope.update(extra)
+    return scope
+
+
+def _request_over_cap_page(monkeypatch, scope):
+    captured, finished = {}, []
+    gate = _over_cap_gate(monkeypatch, captured, finished)
     page = linkedin_discovery._request_page(
         scope,
         1,
         user_agent="test-agent",
-        gate=FakeGate(),
+        gate=gate,
         parse_cards=lambda elements: [],
         physical_attempts=[0],
         physical_limit=100,
         maximum_lookback_seconds=48 * 3600,
         deadline=None,
     )
+    return page, captured, finished
 
-    assert page["lookback_seconds"] == 48 * 3600
-    assert "f_TPR=r172800" in captured["url"]
+
+def test_declared_truncation_point_is_fetched_not_fatal(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    expired_latest = now - timedelta(hours=48)
+    scope = _over_cap_scope(
+        now, expired_window_latest_at=expired_latest.isoformat()
+    )
+    page, captured, finished = _request_over_cap_page(monkeypatch, scope)
+
+    from datetime import datetime
+
+    page_earliest = datetime.fromisoformat(page["source_window_earliest_at"])
+    # Ceil-rounded lookback lands on or just before the truncation point.
+    assert page_earliest <= expired_latest
+    assert (expired_latest - page_earliest).total_seconds() < 2
+    assert 48 * 3600 <= page["lookback_seconds"] <= 48 * 3600 + 300
+    assert f"f_TPR=r{page['lookback_seconds']}" in captured["url"]
     assert finished == [("no_results", 200)]
+
+
+def test_undeclared_over_cap_window_still_fails(monkeypatch):
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    scope = _over_cap_scope(now)
+    captured, finished = {}, []
+    gate = _over_cap_gate(monkeypatch, captured, finished)
+
+    with pytest.raises(linkedin_discovery.DiscoveryError, match="recovery cap"):
+        linkedin_discovery._request_page(
+            scope,
+            1,
+            user_agent="test-agent",
+            gate=gate,
+            parse_cards=lambda elements: [],
+            physical_attempts=[0],
+            physical_limit=100,
+            maximum_lookback_seconds=48 * 3600,
+            deadline=None,
+        )
+    assert finished == [("window_expired", None)]

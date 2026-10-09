@@ -215,6 +215,39 @@ def _fingerprint(value: Any) -> str:
     ).hexdigest()
 
 
+def _parse_optional_timestamptz(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _effective_fetch_anchor(scope: dict[str, Any], persisted_anchor: datetime) -> datetime:
+    """Anchor a fetch at the declared truncation point when one exists.
+
+    Outage gaps leave persisted scope anchors older than the recovery cap
+    while the manifest declares the beyond-cap slice as expired_window_*
+    coverage debt. The commit path accepts exactly that effective window, so
+    fetching from the truncation point keeps fetch, commit, and scope-finish
+    evidence in agreement; the expired slice is recorded as
+    expired_unresolved debt at scope finish, never silently dropped.
+    """
+    truncation = _parse_optional_timestamptz(scope.get("expired_window_latest_at"))
+    if truncation is None or truncation <= persisted_anchor:
+        return persisted_anchor
+    return truncation
+
+
+def _manifest_drift_allowance(scope: dict[str, Any], started_at: datetime) -> int:
+    """Tolerate exactly the intra-run drift between manifest build and fetch."""
+    request_anchor = _parse_optional_timestamptz(scope.get("request_anchor_at"))
+    if request_anchor is None:
+        return 0
+    return max(0, math.ceil((started_at - request_anchor).total_seconds()))
+
+
 def _request_page(
     scope: dict[str, Any],
     page_number: int,
@@ -243,22 +276,21 @@ def _request_page(
             )
         except LinkedInRequestDeadlineExceeded as exc:
             raise RetryableDiscoveryInterruption(str(exc)) from exc
-        lookback_seconds = max(1, math.ceil((grant.started_at - anchor).total_seconds()))
+        fetch_anchor = _effective_fetch_anchor(scope, anchor)
+        lookback_seconds = max(1, math.ceil((grant.started_at - fetch_anchor).total_seconds()))
         if (maximum_lookback_seconds is not None
-                and lookback_seconds > maximum_lookback_seconds):
-            # Outage gaps leave persisted scope anchors older than the
-            # recovery cap. The manifest records the beyond-cap slice as
-            # expired_window_* coverage debt, so fetch the capped window and
-            # keep the run alive instead of failing it; later deep sweeps
-            # re-cover the expired slice. The truncation stays visible in the
-            # page receipt (lookback_seconds, source_window_earliest_at).
-            logging.warning(
-                "Discovery scope %s window %ss exceeds recovery cap %ss; fetching capped window",
-                scope.get("scope_key"),
-                lookback_seconds,
-                maximum_lookback_seconds,
+                and lookback_seconds > maximum_lookback_seconds + _manifest_drift_allowance(scope, grant.started_at)):
+            gate.finish(grant, "window_expired", None)
+            raise DiscoveryError(
+                "persisted discovery window exceeds the supported recovery cap"
             )
-            lookback_seconds = maximum_lookback_seconds
+        if fetch_anchor > anchor:
+            logging.warning(
+                "Discovery scope %s fetching from declared truncation point %s (persisted anchor %s); expired slice recorded as coverage debt",
+                scope.get("scope_key"),
+                fetch_anchor.isoformat(),
+                scope.get("source_window_earliest_at"),
+            )
         effective_earliest = grant.started_at - timedelta(seconds=lookback_seconds)
         params = {
             "keywords": scope["query"],

@@ -1214,3 +1214,15 @@ def test_lane_resume_profile_migration_is_atomic_and_base_replacement_is_fk_safe
     replace_body = init.split('CREATE OR REPLACE FUNCTION "public"."replace_base_resume"', 1)[1].split("$$;", 1)[0]
     assert "DELETE FROM public.base_resume" not in replace_body
     assert "FOR UPDATE" in replace_body
+
+
+def test_commit_containment_honors_declared_expired_windows():
+    sql = (ROOT / "supabase_setup" / "fix_commit_expired_window_containment.sql").read_text()
+    lowered = sql.lower()
+    assert "commit_linkedin_discovery_page" in lowered
+    assert "finish_linkedin_discovery_scope" in lowered
+    assert "coalesce(scope_row.expired_window_latest_at, scope_row.source_window_earliest_at)" in lowered
+    assert "page window does not contain manifest window" in lowered
+    assert "incomplete durable page evidence" in lowered
+    # Guarded in-place patch: fails loudly instead of silently no-op'ing.
+    assert "patch did not apply" in lowered
