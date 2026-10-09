@@ -170,9 +170,10 @@ jobs:
             exit 0
           fi
           gh label create pipeline-gate \
+            --repo "${{ github.repository }}" \
             --description "Deferred publication gate blocking ingestion watermark" \
             --color B60205 2>/dev/null || true
-          OPEN_ISSUE=$(gh issue list --label pipeline-gate --state open --json number --jq '.[0].number // empty')
+          OPEN_ISSUE=$(gh issue list --repo "${{ github.repository }}" --label pipeline-gate --state open --json number --jq '.[0].number // empty')
           RUN_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           if [ "$GATE_OUTCOME" = "deferred" ] && [ "${GATE_BLOCKING_COUNT:-0}" != "0" ]; then
             BODY="Publication gate deferred on run <$RUN_LINK>."
@@ -181,16 +182,16 @@ jobs:
             BODY="$BODY The watermark is frozen; hourly runs are no-ops until the blocking requirements are reviewed."
             BODY="$BODY Unblock with a reviewed accept_linkedin_discovery_requirement call (see the gate step summary for the exact statement)."
             if [ -z "$OPEN_ISSUE" ]; then
-              gh issue create --label pipeline-gate \
+              gh issue create --repo "${{ github.repository }}" --label pipeline-gate \
                 --title "Publication gate deferred: cycle $GATE_CYCLE_ID blocked" \
                 --body "$BODY"
             else
-              gh issue comment "$OPEN_ISSUE" --body "Still deferred on run <$RUN_LINK>. $BODY"
+              gh issue comment --repo "${{ github.repository }}" "$OPEN_ISSUE" --body "Still deferred on run <$RUN_LINK>. $BODY"
             fi
           elif [ "$GATE_OUTCOME" = "published" ] || [ "$GATE_OUTCOME" = "unchanged" ]; then
             if [ -n "$OPEN_ISSUE" ]; then
-              gh issue comment "$OPEN_ISSUE" --body "Gate $GATE_OUTCOME (generation \`$GATE_GENERATION\`) on run <$RUN_LINK>; closing."
-              gh issue close "$OPEN_ISSUE"
+              gh issue comment --repo "${{ github.repository }}" "$OPEN_ISSUE" --body "Gate $GATE_OUTCOME (generation \`$GATE_GENERATION\`) on run <$RUN_LINK>; closing."
+              gh issue close --repo "${{ github.repository }}" "$OPEN_ISSUE"
             else
               echo "Gate $GATE_OUTCOME; no open stall issue."
             fi
