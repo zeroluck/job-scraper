@@ -1,3 +1,5 @@
+-- Authoritative copy; web holds a byte-identical history mirror.
+-- Edit here, then mirror the change into the web migration chain.
 -- Forward migration for resumable, terminal-evidence LinkedIn discovery.
 BEGIN;
 

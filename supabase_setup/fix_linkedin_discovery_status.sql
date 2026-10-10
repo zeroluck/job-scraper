@@ -1,3 +1,5 @@
+-- Authoritative copy; web holds a byte-identical history mirror.
+-- Edit here, then mirror the change into the web migration chain.
 -- Correct live progress and publication blocker counts.
 BEGIN;
 

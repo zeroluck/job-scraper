@@ -518,35 +518,35 @@
         "web:supabase/migrations/202609050001_resume_exhaustive_linkedin_discovery.sql",
         "job-scraper:supabase_setup/resume_exhaustive_linkedin_discovery.sql"
       ],
-      "note": "dual-owned; Phase 2 to resolve"
+      "note": "job-scraper authoritative; web file is a chain mirror with byte-identical SQL body (headers differ by ownership pointer, verified 2026-10-10)"
     },
     "fix_linkedin_discovery_status": {
       "files": [
         "web:supabase/migrations/202609060001_fix_linkedin_discovery_status.sql",
         "job-scraper:supabase_setup/fix_linkedin_discovery_status.sql"
       ],
-      "note": "dual-owned; Phase 2 to resolve"
+      "note": "job-scraper authoritative; web file is a chain mirror with byte-identical SQL body (headers differ by ownership pointer, verified 2026-10-10)"
     },
     "drain_sealed_linkedin_discovery": {
       "files": [
         "web:supabase/migrations/202609060002_drain_sealed_linkedin_discovery.sql",
         "job-scraper:supabase_setup/drain_sealed_linkedin_discovery.sql"
       ],
-      "note": "dual-owned; Phase 2 to resolve"
+      "note": "job-scraper authoritative; web file is a chain mirror with byte-identical SQL body (headers differ by ownership pointer, verified 2026-10-10)"
     },
     "batch_freehire_compatibility": {
       "files": [
         "web:supabase/migrations/202609060003_batch_freehire_compatibility.sql",
         "job-scraper:supabase_setup/batch_freehire_compatibility.sql"
       ],
-      "note": "dual-owned; Phase 2 to resolve"
+      "note": "job-scraper authoritative; web file is a chain mirror with byte-identical SQL body (headers differ by ownership pointer, verified 2026-10-10)"
     },
     "allow_freehire_compatibility_reclassification": {
       "files": [
         "web:supabase/migrations/202609070001_allow_freehire_compatibility_reclassification.sql",
         "job-scraper:supabase_setup/allow_freehire_compatibility_reclassification.sql"
       ],
-      "note": "dual-owned; Phase 2 to resolve"
+      "note": "job-scraper authoritative; web file is a chain mirror with byte-identical SQL body (headers differ by ownership pointer, verified 2026-10-10)"
     },
     "gate_lane_workers_on_included": {
       "files": [
@@ -745,7 +745,7 @@
         "web:supabase/migrations/202610040001_optimize_lane_scoring_queue.sql",
         "job-scraper:supabase_setup/optimize_lane_scoring_queue.sql"
       ],
-      "note": "dual-owned; Phase 2 to resolve"
+      "note": "job-scraper authoritative; web file is a chain mirror with byte-identical SQL body (headers differ by ownership pointer, verified 2026-10-10)"
     },
     "add_freehire_compat": {
       "files": [

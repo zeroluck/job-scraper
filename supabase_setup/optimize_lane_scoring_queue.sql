@@ -1,3 +1,5 @@
+-- Authoritative copy; web holds a byte-identical history mirror.
+-- Edit here, then mirror the change into the web migration chain.
 BEGIN;
 
 CREATE INDEX IF NOT EXISTS job_archetype_memberships_score_queue_idx

@@ -1,3 +1,5 @@
+-- Authoritative copy; web holds a byte-identical history mirror.
+-- Edit here, then mirror the change into the web migration chain.
 -- Allow eligible rows to replace obsolete input hashes under the source snapshot fence.
 BEGIN;
 

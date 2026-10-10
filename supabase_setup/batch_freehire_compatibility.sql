@@ -1,3 +1,5 @@
+-- Authoritative copy; web holds a byte-identical history mirror.
+-- Edit here, then mirror the change into the web migration chain.
 -- Batch Freehire compatibility claims and writes to minimize Data API traffic.
 BEGIN;
 
