@@ -1226,3 +1226,37 @@ def test_commit_containment_honors_declared_expired_windows():
     assert "incomplete durable page evidence" in lowered
     # Guarded in-place patch: fails loudly instead of silently no-op'ing.
     assert "patch did not apply" in lowered
+
+
+def test_oct4_reconcile_pins_live_keyword_title_definitions():
+    sql = (ROOT / "supabase_setup" / "fix_reconcile_oct4_keyword_title_drift.sql").read_text()
+    body = "\n".join(
+        line for line in sql.splitlines() if not line.lstrip().startswith("--")
+    )
+    normalized = re.sub(r"\s+", " ", body.lower())
+
+    # Oct-4 delta: drill-down folds case at match time (versioned files match exactly).
+    assert "lower(btrim(jki.keyword)) = lower(btrim(p_keyword))" in normalized
+    assert "jki.keyword = p_keyword" not in normalized
+    # Title-rewrite delta: aggregate emits `count`, matching the outer t.count ref.
+    assert "select r.display as label, r.total as count," in normalized
+    assert "r.total as title_count" not in normalized
+    # Baseline pins: qualify-jobs-first aggregate + canonical display labels.
+    assert "qualified_jobs as materialized" in normalized
+    assert "join qualified_jobs q on q.job_id = jki.job_id" in normalized
+    assert "order by lc.keyword_key, lc.category, lc.label_count desc, lc.keyword asc" in normalized
+    # Planner settings pins.
+    assert "set work_mem = '256mb'" in normalized
+    assert "set plan_cache_mode = force_custom_plan" in normalized
+    assert "set enable_nestloop = off" in normalized
+    # Oct-4 expression index pins.
+    assert "idx_job_keyword_insights_keyword_key_category_job" in normalized
+    assert "idx_keyword_insights_keyword_key_category_label" in normalized
+    # Deny-by-default grants, service_role only.
+    assert "from public, anon, authenticated" in normalized
+    assert "to service_role" in normalized
+    # Idempotent-only statements: no drops, no truncates.
+    assert "create or replace function" in normalized
+    assert "create index if not exists" in normalized
+    assert "drop " not in normalized
+    assert "truncate " not in normalized
