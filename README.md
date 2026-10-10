@@ -64,6 +64,7 @@ The production path is GitHub Actions + Supabase. Local execution uses the same 
     - Next, apply the migrations in the companion `job-scraper-web/supabase/migrations` directory. The configurable-lane migration adds `job_archetype_memberships`, the lane registry, search configuration, resume profiles, protected RPCs, and the explicit `software_tpm` → `technology_delivery` compatibility alias.
     - Do not start scraping until those companion migrations have completed. Existing installations must have the companion membership schema in place before applying standalone `supabase_setup/add_adaptive_linkedin_discovery.sql`; that migration intentionally fails fast when the contract is absent.
     - For an older schema, apply outstanding migrations in order rather than editing production tables manually.
+    - Migration rule: all DDL via repo migration files with idempotent statements only (`CREATE OR REPLACE`, `IF NOT EXISTS`, guarded `DO` blocks). Apply with `supabase db push` so stamps match, or MCP apply + immediate update of `supabase_setup/migration_manifest.json` using the RETURNED stamp. `scripts/check_migration_drift.py` (CI: `migration-drift` workflow) fails on any applied migration without a repo file and vice versa.
     - Scheduled `Analyze Job Insights` runs only process new unanalyzed jobs. Use the manual `replacement_backfill` workflow input only when you explicitly want a one-time reanalysis of previously analyzed jobs.
 
 3.  **Obtain API Keys for Your LLM Provider:**

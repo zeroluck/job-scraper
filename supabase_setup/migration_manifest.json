@@ -1,0 +1,982 @@
+{
+  "project_ref": "lcygogvpedfwzlzvlysa",
+  "last_verified": "2026-10-10",
+  "history_hash": "fef6e0284568b11286664983766fc154",
+  "applied": [
+    {
+      "version": "20260822094616",
+      "name": "keyword_insights_provider_primary_key"
+    },
+    {
+      "version": "20260822134906",
+      "name": "job_data_surface_rpcs"
+    },
+    {
+      "version": "20260822203101",
+      "name": "add_linkedin_metadata_observation_fields"
+    },
+    {
+      "version": "20260822205257",
+      "name": "expand_job_filter_suggestions"
+    },
+    {
+      "version": "20260822205352",
+      "name": "add_job_geography_classification"
+    },
+    {
+      "version": "20260822210055",
+      "name": "filter_insights_by_geography"
+    },
+    {
+      "version": "20260822212023",
+      "name": "add_historical_repost_merge_support"
+    },
+    {
+      "version": "20260822212303",
+      "name": "fix_historical_repost_merge_generated_columns"
+    },
+    {
+      "version": "20260822214048",
+      "name": "remove_ambiguous_job_resume_relationship"
+    },
+    {
+      "version": "20260822222138",
+      "name": "include_country_with_province_insights"
+    },
+    {
+      "version": "20260823023148",
+      "name": "add_posting_wave_semantics"
+    },
+    {
+      "version": "20260827135446",
+      "name": "drop_legacy_top_scored_jobs_overload"
+    },
+    {
+      "version": "20260827140816",
+      "name": "add_freehire_compat"
+    },
+    {
+      "version": "20260827140817",
+      "name": "add_same_id_relist_tracking"
+    },
+    {
+      "version": "20260827140818",
+      "name": "drop_legacy_top_scored_jobs_overload"
+    },
+    {
+      "version": "20260827182854",
+      "name": "add_scrape_run_state"
+    },
+    {
+      "version": "20260827190239",
+      "name": "allow_service_role_scrape_watermark"
+    },
+    {
+      "version": "20260827191934",
+      "name": "add_record_scrape_success_rpc"
+    },
+    {
+      "version": "20260827205255",
+      "name": "add_same_id_relist_repair_rpc"
+    },
+    {
+      "version": "20260828053828",
+      "name": "add_freehire_publication_snapshots"
+    },
+    {
+      "version": "20260828081109",
+      "name": "add_incremental_keyword_insights_rpc"
+    },
+    {
+      "version": "20260828081110",
+      "name": "update_historical_repost_merge_atomic"
+    },
+    {
+      "version": "20260828221722",
+      "name": "folded_job_location_facets"
+    },
+    {
+      "version": "20260828225410",
+      "name": "validate_body_hash_fuzzy_title_merges"
+    },
+    {
+      "version": "20260828225830",
+      "name": "allow_merge_plan_cleanup"
+    },
+    {
+      "version": "20260828230007",
+      "name": "permit_guarded_merge_deletes"
+    },
+    {
+      "version": "20260828230246",
+      "name": "allow_atomic_plan_replacement_cleanup"
+    },
+    {
+      "version": "20260828230439",
+      "name": "preserve_append_only_observations_on_merge"
+    },
+    {
+      "version": "20260831071713",
+      "name": "effective_posted_at"
+    },
+    {
+      "version": "20260831073307",
+      "name": "match_effective_posted_sort_index"
+    },
+    {
+      "version": "20260831091824",
+      "name": "boolean_job_search"
+    },
+    {
+      "version": "20260831095053",
+      "name": "fix_boolean_job_search"
+    },
+    {
+      "version": "20260831101355",
+      "name": "harden_boolean_job_search"
+    },
+    {
+      "version": "202609010001",
+      "name": "configurable_career_lanes"
+    },
+    {
+      "version": "20260903021707",
+      "name": "decouple_publication_pruning"
+    },
+    {
+      "version": "20260903061827",
+      "name": "bound_publication_maintenance_timeout"
+    },
+    {
+      "version": "20260903063554",
+      "name": "remove_unbounded_publication_bootstrap_prune"
+    },
+    {
+      "version": "20260904013917",
+      "name": "add_ingestion_page_coverage"
+    },
+    {
+      "version": "20260904014030",
+      "name": "restore_linkedin_page_depth"
+    },
+    {
+      "version": "202609050001",
+      "name": "resume_exhaustive_linkedin_discovery"
+    },
+    {
+      "version": "202609060001",
+      "name": "fix_linkedin_discovery_status"
+    },
+    {
+      "version": "202609060002",
+      "name": "drain_sealed_linkedin_discovery"
+    },
+    {
+      "version": "202609060003",
+      "name": "batch_freehire_compatibility"
+    },
+    {
+      "version": "202609070001",
+      "name": "allow_freehire_compatibility_reclassification"
+    },
+    {
+      "version": "20260907115147",
+      "name": "gate_lane_workers_on_included"
+    },
+    {
+      "version": "20260907123302",
+      "name": "reduce_linkedin_query_noise"
+    },
+    {
+      "version": "20260909083410",
+      "name": "apply_refined_target_profiles"
+    },
+    {
+      "version": "20260909084057",
+      "name": "correct_refined_target_profiles_exact_content"
+    },
+    {
+      "version": "20260912080828",
+      "name": "restore_atomic_base_resume_replacement"
+    },
+    {
+      "version": "20260912083555",
+      "name": "add_lane_aware_resume_profiles"
+    },
+    {
+      "version": "20260912084325",
+      "name": "optimize_filtered_keyword_insights"
+    },
+    {
+      "version": "20260912095028",
+      "name": "get_keyword_job_ids"
+    },
+    {
+      "version": "20260912135745",
+      "name": "fix_keyword_job_drilldown"
+    },
+    {
+      "version": "20260918021233",
+      "name": "tune_keyword_insights_work_mem"
+    },
+    {
+      "version": "20260918023653",
+      "name": "get_location_insights"
+    },
+    {
+      "version": "20260918023746",
+      "name": "get_location_job_ids_fixed"
+    },
+    {
+      "version": "20260918030339",
+      "name": "enable_unaccent"
+    },
+    {
+      "version": "20260918030801",
+      "name": "location_display_resolution"
+    },
+    {
+      "version": "20260918030814",
+      "name": "location_bucket_functions"
+    },
+    {
+      "version": "20260918030936",
+      "name": "drop_old_location_rpcs"
+    },
+    {
+      "version": "20260918030958",
+      "name": "create_location_insights_display"
+    },
+    {
+      "version": "20260918031328",
+      "name": "fix_alias_typo"
+    },
+    {
+      "version": "20260918031338",
+      "name": "fix_location_display_suffix"
+    },
+    {
+      "version": "20260918031348",
+      "name": "create_location_job_ids_label"
+    },
+    {
+      "version": "20260918031550",
+      "name": "location_hints_and_wildcard"
+    },
+    {
+      "version": "20260918031738",
+      "name": "location_multi_and_display_tweaks"
+    },
+    {
+      "version": "20260918031752",
+      "name": "refresh_insights_display_multi"
+    },
+    {
+      "version": "20260918032057",
+      "name": "location_bucket_province_segment"
+    },
+    {
+      "version": "20260918032220",
+      "name": "fix_province_display_branch"
+    },
+    {
+      "version": "20260918032811",
+      "name": "title_insights_rpcs"
+    },
+    {
+      "version": "20260918034203",
+      "name": "tmp_bisect_a"
+    },
+    {
+      "version": "20260918034220",
+      "name": "tmp_bisect_b"
+    },
+    {
+      "version": "20260918034251",
+      "name": "tmp_bisect_c"
+    },
+    {
+      "version": "20260918034314",
+      "name": "rewrite_title_insights_window"
+    },
+    {
+      "version": "20260918034424",
+      "name": "force_custom_plan_title"
+    },
+    {
+      "version": "20260918034648",
+      "name": "title_no_nestloop"
+    },
+    {
+      "version": "20260918041608",
+      "name": "202609180006_location_fold_percapita"
+    },
+    {
+      "version": "20260918042220",
+      "name": "202609180006_location_fold_percapita_delta_core"
+    },
+    {
+      "version": "20260918042303",
+      "name": "202609180006_location_fold_percapita_delta_order"
+    },
+    {
+      "version": "20260918042928",
+      "name": "202609180007_census_population_seed"
+    },
+    {
+      "version": "20260918042949",
+      "name": "202609180007_census_population_seed_cities_a"
+    },
+    {
+      "version": "20260918043011",
+      "name": "202609180007_census_population_seed_cities_b"
+    },
+    {
+      "version": "20260918053748",
+      "name": "location_insights_place_view_compatibility"
+    },
+    {
+      "version": "20260918054558",
+      "name": "location_job_ids_timeout_compatibility"
+    },
+    {
+      "version": "20260918060037",
+      "name": "cached_location_rpcs"
+    },
+    {
+      "version": "20260918060822",
+      "name": "cached_location_job_ids"
+    },
+    {
+      "version": "20260918063517",
+      "name": "canonical_location_rpc_stabilization"
+    },
+    {
+      "version": "20260918063725",
+      "name": "location_rpc_custom_plans"
+    },
+    {
+      "version": "20260918064119",
+      "name": "dynamic_location_rpc_plans"
+    },
+    {
+      "version": "20260918064321",
+      "name": "statcan_cma_membership"
+    },
+    {
+      "version": "20260918065524",
+      "name": "restrict_location_trigger_function"
+    },
+    {
+      "version": "20260918074035",
+      "name": "location_posted_date_bounds"
+    },
+    {
+      "version": "20260919044413",
+      "name": "location_map_insights"
+    },
+    {
+      "version": "20260919050342",
+      "name": "canada_place_coordinates"
+    },
+    {
+      "version": "20260919221500",
+      "name": "reliable_applicant_contention"
+    },
+    {
+      "version": "20260919230000",
+      "name": "contention_latest_posting_wave"
+    },
+    {
+      "version": "20260919231500",
+      "name": "contention_exact_counts_only"
+    },
+    {
+      "version": "20260927080232",
+      "name": "harden_public_data_api"
+    },
+    {
+      "version": "202610040001",
+      "name": "optimize_lane_scoring_queue"
+    },
+    {
+      "version": "20261004202518",
+      "name": "normalize_keyword_insight_case"
+    },
+    {
+      "version": "20261004202859",
+      "name": "optimize_case_insensitive_keyword_aggregation"
+    },
+    {
+      "version": "20261004203719",
+      "name": "preserve_canonical_keyword_display_labels"
+    },
+    {
+      "version": "20261004203900",
+      "name": "stabilize_keyword_label_query_plan"
+    },
+    {
+      "version": "20261004204131",
+      "name": "index_and_bound_keyword_label_resolution"
+    },
+    {
+      "version": "20261009050255",
+      "name": "qualify_jobs_first_keyword_insights"
+    },
+    {
+      "version": "20261009061839",
+      "name": "fix_commit_expired_window_containment"
+    },
+    {
+      "version": "20261009191208",
+      "name": "enable_pg_cron_probe"
+    },
+    {
+      "version": "20261009191235",
+      "name": "keyword_insights_summary"
+    },
+    {
+      "version": "20261009191949",
+      "name": "refresh_chunked_per_category"
+    },
+    {
+      "version": "20261009192827",
+      "name": "refresh_hash_chunked"
+    },
+    {
+      "version": "20261010001844",
+      "name": "reconcile_oct4_keyword_title_drift"
+    },
+    {
+      "version": "20261010001901",
+      "name": "reconcile_oct4_filtered_body_correction"
+    }
+  ],
+  "owned": {
+    "job_data_surface_rpcs": {
+      "files": [
+        "web:supabase/migrations/202606140001_job_data_surface_rpcs.sql"
+      ],
+      "note": "file stamp predates apply; name coverage holds"
+    },
+    "add_job_geography_classification": {
+      "files": [
+        "web:supabase/migrations/202608220001_job_geography_classification.sql"
+      ],
+      "note": "file lacks add_ prefix"
+    },
+    "filter_insights_by_geography": {
+      "files": [
+        "web:supabase/migrations/202608220002_filter_insights_by_geography.sql"
+      ],
+      "note": ""
+    },
+    "folded_job_location_facets": {
+      "files": [
+        "web:supabase/migrations/202608280002_folded_job_location_facets.sql"
+      ],
+      "note": ""
+    },
+    "effective_posted_at": {
+      "files": [
+        "web:supabase/migrations/20260831071713_effective_posted_at.sql"
+      ],
+      "note": ""
+    },
+    "match_effective_posted_sort_index": {
+      "files": [
+        "web:supabase/migrations/20260831073307_match_effective_posted_sort_index.sql"
+      ],
+      "note": ""
+    },
+    "boolean_job_search": {
+      "files": [
+        "web:supabase/migrations/20260831091824_boolean_job_search.sql"
+      ],
+      "note": ""
+    },
+    "fix_boolean_job_search": {
+      "files": [
+        "web:supabase/migrations/20260831095053_fix_boolean_job_search.sql"
+      ],
+      "note": ""
+    },
+    "harden_boolean_job_search": {
+      "files": [
+        "web:supabase/migrations/20260831101355_harden_boolean_job_search.sql"
+      ],
+      "note": ""
+    },
+    "configurable_career_lanes": {
+      "files": [
+        "web:supabase/migrations/202609010001_configurable_career_lanes.sql"
+      ],
+      "note": ""
+    },
+    "resume_exhaustive_linkedin_discovery": {
+      "files": [
+        "web:supabase/migrations/202609050001_resume_exhaustive_linkedin_discovery.sql",
+        "job-scraper:supabase_setup/resume_exhaustive_linkedin_discovery.sql"
+      ],
+      "note": "dual-owned; Phase 2 to resolve"
+    },
+    "fix_linkedin_discovery_status": {
+      "files": [
+        "web:supabase/migrations/202609060001_fix_linkedin_discovery_status.sql",
+        "job-scraper:supabase_setup/fix_linkedin_discovery_status.sql"
+      ],
+      "note": "dual-owned; Phase 2 to resolve"
+    },
+    "drain_sealed_linkedin_discovery": {
+      "files": [
+        "web:supabase/migrations/202609060002_drain_sealed_linkedin_discovery.sql",
+        "job-scraper:supabase_setup/drain_sealed_linkedin_discovery.sql"
+      ],
+      "note": "dual-owned; Phase 2 to resolve"
+    },
+    "batch_freehire_compatibility": {
+      "files": [
+        "web:supabase/migrations/202609060003_batch_freehire_compatibility.sql",
+        "job-scraper:supabase_setup/batch_freehire_compatibility.sql"
+      ],
+      "note": "dual-owned; Phase 2 to resolve"
+    },
+    "allow_freehire_compatibility_reclassification": {
+      "files": [
+        "web:supabase/migrations/202609070001_allow_freehire_compatibility_reclassification.sql",
+        "job-scraper:supabase_setup/allow_freehire_compatibility_reclassification.sql"
+      ],
+      "note": "dual-owned; Phase 2 to resolve"
+    },
+    "gate_lane_workers_on_included": {
+      "files": [
+        "web:supabase/migrations/202609070002_gate_lane_workers_on_included.sql"
+      ],
+      "note": ""
+    },
+    "reduce_linkedin_query_noise": {
+      "files": [
+        "web:supabase/migrations/202609070003_reduce_linkedin_query_noise.sql"
+      ],
+      "note": ""
+    },
+    "apply_refined_target_profiles": {
+      "files": [
+        "web:supabase/migrations/20260909083410_apply_refined_target_profiles.sql"
+      ],
+      "note": ""
+    },
+    "correct_refined_target_profiles_exact_content": {
+      "files": [
+        "web:supabase/migrations/20260909084057_correct_refined_target_profiles_exact_content.sql"
+      ],
+      "note": ""
+    },
+    "optimize_filtered_keyword_insights": {
+      "files": [
+        "web:supabase/migrations/202609120001_optimize_filtered_keyword_insights.sql"
+      ],
+      "note": ""
+    },
+    "get_keyword_job_ids": {
+      "files": [
+        "web:supabase/migrations/202609120002_get_keyword_job_ids.sql"
+      ],
+      "note": ""
+    },
+    "fix_keyword_job_drilldown": {
+      "files": [
+        "web:supabase/migrations/202609120003_fix_keyword_job_drilldown.sql"
+      ],
+      "note": ""
+    },
+    "tune_keyword_insights_work_mem": {
+      "files": [
+        "web:supabase/migrations/202609180001_tune_keyword_insights_work_mem.sql"
+      ],
+      "note": ""
+    },
+    "get_location_insights": {
+      "files": [
+        "web:supabase/migrations/202609180002_get_location_insights.sql"
+      ],
+      "note": ""
+    },
+    "get_location_job_ids_fixed": {
+      "files": [
+        "web:supabase/migrations/202609180003_get_location_job_ids.sql"
+      ],
+      "note": "applied with _fixed suffix"
+    },
+    "location_display_resolution": {
+      "files": [
+        "web:supabase/migrations/202609180004_location_display_resolution.sql"
+      ],
+      "note": ""
+    },
+    "title_insights_rpcs": {
+      "files": [
+        "web:supabase/migrations/202609180005_title_insights.sql"
+      ],
+      "note": "applied with _rpcs suffix; live body since refined, pinned in fix_reconcile file"
+    },
+    "202609180006_location_fold_percapita": {
+      "files": [
+        "web:supabase/migrations/202609180006_location_fold_percapita.sql"
+      ],
+      "note": "composite name embeds original stamp"
+    },
+    "202609180006_location_fold_percapita_delta_core": {
+      "files": [
+        "web:supabase/migrations/202609180006_location_fold_percapita.sql"
+      ],
+      "note": "composite name embeds original stamp"
+    },
+    "202609180006_location_fold_percapita_delta_order": {
+      "files": [
+        "web:supabase/migrations/202609180006_location_fold_percapita.sql"
+      ],
+      "note": "composite name embeds original stamp"
+    },
+    "202609180007_census_population_seed": {
+      "files": [
+        "web:supabase/migrations/202609180007_census_population_seed.sql"
+      ],
+      "note": "composite name embeds original stamp"
+    },
+    "202609180007_census_population_seed_cities_a": {
+      "files": [
+        "web:supabase/migrations/202609180007_census_population_seed.sql"
+      ],
+      "note": "composite name embeds original stamp"
+    },
+    "202609180007_census_population_seed_cities_b": {
+      "files": [
+        "web:supabase/migrations/202609180007_census_population_seed.sql"
+      ],
+      "note": "composite name embeds original stamp"
+    },
+    "canonical_location_rpc_stabilization": {
+      "files": [
+        "web:supabase/migrations/202609180012_location_rpc_stabilization.sql"
+      ],
+      "note": "applied under canonical_* name; superseded by dynamic shape (verified live 2026-10-10)"
+    },
+    "dynamic_location_rpc_plans": {
+      "files": [
+        "web:supabase/migrations/202609180014_dynamic_location_rpc_plans.sql"
+      ],
+      "note": ""
+    },
+    "statcan_cma_membership": {
+      "files": [
+        "web:supabase/migrations/202609180015_statcan_cma_membership.sql"
+      ],
+      "note": ""
+    },
+    "restrict_location_trigger_function": {
+      "files": [
+        "web:supabase/migrations/202609180016_restrict_location_trigger_function.sql"
+      ],
+      "note": ""
+    },
+    "location_posted_date_bounds": {
+      "files": [
+        "web:supabase/migrations/202609180017_location_posted_date_bounds.sql"
+      ],
+      "note": ""
+    },
+    "location_map_insights": {
+      "files": [
+        "web:supabase/migrations/20260919044413_location_map_insights.sql"
+      ],
+      "note": ""
+    },
+    "canada_place_coordinates": {
+      "files": [
+        "web:supabase/migrations/20260919050342_canada_place_coordinates.sql"
+      ],
+      "note": ""
+    },
+    "reliable_applicant_contention": {
+      "files": [
+        "web:supabase/migrations/20260919221500_reliable_applicant_contention.sql"
+      ],
+      "note": ""
+    },
+    "contention_latest_posting_wave": {
+      "files": [
+        "web:supabase/migrations/20260919230000_contention_latest_posting_wave.sql"
+      ],
+      "note": ""
+    },
+    "contention_exact_counts_only": {
+      "files": [
+        "web:supabase/migrations/20260919231500_contention_exact_counts_only.sql"
+      ],
+      "note": ""
+    },
+    "normalize_keyword_insight_case": {
+      "files": [
+        "web:supabase/migrations/202610040002_normalize_keyword_insight_case.sql"
+      ],
+      "note": "MCP stamp differs; final body pinned in fix_reconcile file"
+    },
+    "qualify_jobs_first_keyword_insights": {
+      "files": [
+        "web:supabase/migrations/202610090001_qualify_jobs_first_keyword_insights.sql"
+      ],
+      "note": "MCP stamp differs"
+    },
+    "keyword_insights_summary": {
+      "files": [
+        "web:supabase/migrations/202610090002_keyword_insights_summary.sql"
+      ],
+      "note": "MCP stamp differs"
+    },
+    "enable_unaccent": {
+      "files": [
+        "web:supabase/migrations/202609180004_location_display_resolution.sql"
+      ],
+      "note": "extension created by this file; probed under separate apply name"
+    },
+    "optimize_lane_scoring_queue": {
+      "files": [
+        "web:supabase/migrations/202610040001_optimize_lane_scoring_queue.sql",
+        "job-scraper:supabase_setup/optimize_lane_scoring_queue.sql"
+      ],
+      "note": "dual-owned; Phase 2 to resolve"
+    },
+    "add_freehire_compat": {
+      "files": [
+        "job-scraper:supabase_setup/add_freehire_compat.sql"
+      ],
+      "note": ""
+    },
+    "add_same_id_relist_tracking": {
+      "files": [
+        "job-scraper:supabase_setup/add_same_id_relist_tracking.sql"
+      ],
+      "note": ""
+    },
+    "drop_legacy_top_scored_jobs_overload": {
+      "files": [
+        "job-scraper:supabase_setup/drop_legacy_top_scored_jobs_overload.sql"
+      ],
+      "note": "applied twice under same name"
+    },
+    "add_scrape_run_state": {
+      "files": [
+        "job-scraper:supabase_setup/add_scrape_run_state.sql"
+      ],
+      "note": ""
+    },
+    "allow_service_role_scrape_watermark": {
+      "files": [
+        "job-scraper:supabase_setup/add_scrape_run_state.sql"
+      ],
+      "note": "watermark policy part of scrape-state file"
+    },
+    "add_record_scrape_success_rpc": {
+      "files": [
+        "job-scraper:supabase_setup/add_scrape_run_state.sql"
+      ],
+      "note": "RPC defined in scrape-state file (repo test pins)"
+    },
+    "add_same_id_relist_repair_rpc": {
+      "files": [
+        "job-scraper:supabase_setup/add_same_id_relist_tracking.sql"
+      ],
+      "note": "RPC defined in relist file (repo test pins)"
+    },
+    "add_freehire_publication_snapshots": {
+      "files": [
+        "job-scraper:supabase_setup/add_freehire_publication_snapshots.sql"
+      ],
+      "note": ""
+    },
+    "decouple_publication_pruning": {
+      "files": [
+        "job-scraper:supabase_setup/add_freehire_publication_snapshots.sql"
+      ],
+      "note": "pruning refinements accumulated in snapshots file"
+    },
+    "bound_publication_maintenance_timeout": {
+      "files": [
+        "job-scraper:supabase_setup/add_freehire_publication_snapshots.sql"
+      ],
+      "note": "pruning refinements accumulated in snapshots file"
+    },
+    "remove_unbounded_publication_bootstrap_prune": {
+      "files": [
+        "job-scraper:supabase_setup/add_freehire_publication_snapshots.sql"
+      ],
+      "note": "pruning refinements accumulated in snapshots file"
+    },
+    "add_incremental_keyword_insights_rpc": {
+      "files": [
+        "job-scraper:supabase_setup/add_incremental_keyword_insights_rpc.sql"
+      ],
+      "note": ""
+    },
+    "add_posting_wave_semantics": {
+      "files": [
+        "job-scraper:supabase_setup/add_posting_wave_semantics.sql"
+      ],
+      "note": ""
+    },
+    "add_ingestion_page_coverage": {
+      "files": [
+        "job-scraper:supabase_setup/add_ingestion_page_coverage.sql"
+      ],
+      "note": ""
+    },
+    "restore_linkedin_page_depth": {
+      "files": [
+        "job-scraper:supabase_setup/restore_linkedin_page_depth.sql"
+      ],
+      "note": ""
+    },
+    "add_lane_aware_resume_profiles": {
+      "files": [
+        "job-scraper:supabase_setup/add_lane_aware_resume_profiles.sql"
+      ],
+      "note": ""
+    },
+    "harden_public_data_api": {
+      "files": [
+        "job-scraper:supabase_setup/harden_public_data_api.sql"
+      ],
+      "note": ""
+    },
+    "fix_commit_expired_window_containment": {
+      "files": [
+        "job-scraper:supabase_setup/fix_commit_expired_window_containment.sql"
+      ],
+      "note": ""
+    },
+    "add_historical_repost_merge_support": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "fix_historical_repost_merge_generated_columns": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "preserve_append_only_observations_on_merge": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "allow_atomic_plan_replacement_cleanup": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "permit_guarded_merge_deletes": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "allow_merge_plan_cleanup": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "update_historical_repost_merge_atomic": {
+      "files": [
+        "job-scraper:supabase_setup/merge_historical_reposts.sql"
+      ],
+      "note": "incremental applies accumulated in merge file"
+    },
+    "validate_body_hash_fuzzy_title_merges": {
+      "files": [
+        "job-scraper:supabase_setup/body_hash_fuzzy_title_merge_safety.sql"
+      ],
+      "note": "content-aligned with init snapshot (repo test pins)"
+    },
+    "reconcile_oct4_keyword_title_drift": {
+      "files": [
+        "job-scraper:supabase_setup/fix_reconcile_oct4_keyword_title_drift.sql"
+      ],
+      "note": "MCP stamp; Phase 0 baseline pin"
+    },
+    "reconcile_oct4_filtered_body_correction": {
+      "files": [
+        "job-scraper:supabase_setup/fix_reconcile_oct4_keyword_title_drift.sql"
+      ],
+      "note": "correction re-apply of identical file content"
+    },
+    "optimize_case_insensitive_keyword_aggregation": {
+      "files": [
+        "job-scraper:supabase_setup/fix_reconcile_oct4_keyword_title_drift.sql"
+      ],
+      "note": "Oct-4 intermediate; final body pinned (verified live 2026-10-10)"
+    },
+    "preserve_canonical_keyword_display_labels": {
+      "files": [
+        "job-scraper:supabase_setup/fix_reconcile_oct4_keyword_title_drift.sql"
+      ],
+      "note": "Oct-4 intermediate; final body pinned (verified live 2026-10-10)"
+    },
+    "stabilize_keyword_label_query_plan": {
+      "files": [
+        "job-scraper:supabase_setup/fix_reconcile_oct4_keyword_title_drift.sql"
+      ],
+      "note": "Oct-4 intermediate; final body pinned (verified live 2026-10-10)"
+    },
+    "index_and_bound_keyword_label_resolution": {
+      "files": [
+        "job-scraper:supabase_setup/fix_reconcile_oct4_keyword_title_drift.sql"
+      ],
+      "note": "Oct-4 intermediate; final body pinned (verified live 2026-10-10)"
+    }
+  },
+  "grandfathered": {
+    "tmp_bisect_a": "title-insight rewrite intermediate (history only); final bodies pinned in fix_reconcile file (verified live 2026-10-10)",
+    "tmp_bisect_b": "title-insight rewrite intermediate (history only); final bodies pinned in fix_reconcile file (verified live 2026-10-10)",
+    "tmp_bisect_c": "title-insight rewrite intermediate (history only); final bodies pinned in fix_reconcile file (verified live 2026-10-10)",
+    "rewrite_title_insights_window": "title-insight rewrite intermediate (history only); final bodies pinned in fix_reconcile file (verified live 2026-10-10)",
+    "force_custom_plan_title": "title-insight rewrite intermediate (history only); final bodies pinned in fix_reconcile file (verified live 2026-10-10)",
+    "title_no_nestloop": "title-insight rewrite intermediate (history only); final bodies pinned in fix_reconcile file (verified live 2026-10-10)",
+    "location_bucket_functions": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "drop_old_location_rpcs": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "create_location_insights_display": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "fix_alias_typo": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "fix_location_display_suffix": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "create_location_job_ids_label": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "location_hints_and_wildcard": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "location_multi_and_display_tweaks": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "refresh_insights_display_multi": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "location_bucket_province_segment": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "fix_province_display_branch": "location display-resolution intermediate; superseded by 202609180012 rebuild + 202609180014 dynamic shape (verified live)",
+    "location_rpc_custom_plans": "location RPC tuning intermediate; superseded by 202609180014 (verified live plpgsql-dynamic)",
+    "cached_location_rpcs": "location RPC tuning intermediate; superseded by 202609180014 (verified live plpgsql-dynamic)",
+    "cached_location_job_ids": "location RPC tuning intermediate; superseded by 202609180014 (verified live plpgsql-dynamic)",
+    "location_insights_place_view_compatibility": "location RPC tuning intermediate; superseded by 202609180014 (verified live plpgsql-dynamic)",
+    "location_job_ids_timeout_compatibility": "location RPC tuning intermediate; superseded by 202609180014 (verified live plpgsql-dynamic)",
+    "restore_atomic_base_resume_replacement": "superseded by later add_lane_aware_resume_profiles (same objects, atomic replace)",
+    "enable_pg_cron_probe": "extension probe; pg_cron live; scheduling owned by 202610090002",
+    "refresh_chunked_per_category": "summary-refresh refinement; live refresh body == 202610090002 (verified 8-chunk shape 2026-10-10)",
+    "refresh_hash_chunked": "summary-refresh refinement; live refresh body == 202610090002 (verified 8-chunk shape 2026-10-10)",
+    "keyword_insights_provider_primary_key": "pre-history apply predating versioned sets; objects stable",
+    "add_linkedin_metadata_observation_fields": "pre-history apply predating versioned sets; objects stable",
+    "expand_job_filter_suggestions": "pre-history apply predating versioned sets; objects stable",
+    "include_country_with_province_insights": "pre-history apply predating versioned sets; objects stable",
+    "remove_ambiguous_job_resume_relationship": "pre-history drop; relationship long removed"
+  },
+  "local_only": {
+    "job-scraper:supabase_setup/init.sql": "base-install snapshot; never a versioned apply",
+    "job-scraper:supabase_setup/add_job_insights.sql": "historical base for insight tables; folded into init snapshot",
+    "job-scraper:supabase_setup/add_adaptive_linkedin_discovery.sql": "dev-time migration; prod reached via init snapshot (fresh installs) and resume_exhaustive forward migration (existing)",
+    "job-scraper:supabase_setup/cleanup.sql": "destructive helper; never applied to prod"
+  }
+}

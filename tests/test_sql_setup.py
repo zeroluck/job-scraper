@@ -1,4 +1,6 @@
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1260,3 +1262,18 @@ def test_oct4_reconcile_pins_live_keyword_title_definitions():
     assert "create index if not exists" in normalized
     assert "drop " not in normalized
     assert "truncate " not in normalized
+
+
+def test_migration_drift_check_passes_offline():
+    web_root = ROOT.parent / "job-scraper-web"
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "check_migration_drift.py"),
+        "--root",
+        str(ROOT),
+    ]
+    if web_root.is_dir():
+        cmd += ["--web-root", str(web_root)]
+    completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "drift check passed" in completed.stdout

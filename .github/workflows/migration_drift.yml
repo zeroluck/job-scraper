@@ -1,0 +1,54 @@
+# .github/workflows/migration_drift.yml
+name: migration-drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase_setup/**"
+      - "scripts/check_migration_drift.py"
+      - "tests/test_sql_setup.py"
+      - ".github/workflows/migration_drift.yml"
+  pull_request:
+    paths:
+      - "supabase_setup/**"
+      - "scripts/check_migration_drift.py"
+      - "tests/test_sql_setup.py"
+      - ".github/workflows/migration_drift.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout job-scraper
+        uses: actions/checkout@v4
+        with:
+          path: job-scraper
+
+      # Public repo: no token needed. Sibling layout lets the drift check
+      # verify web-owned migrations in the same run.
+      - name: Checkout job-scraper-web
+        uses: actions/checkout@v4
+        with:
+          repository: zeroluck/job-scraper-web
+          ref: master
+          path: job-scraper-web
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run migration drift check
+        run: python job-scraper/scripts/check_migration_drift.py --root job-scraper --web-root job-scraper-web
+
+      - name: Install test dependencies
+        run: python -m pip install pytest
+
+      - name: Run SQL setup tests
+        run: python -m pytest job-scraper/tests/test_sql_setup.py -q
