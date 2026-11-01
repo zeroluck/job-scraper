@@ -1,0 +1,16 @@
+[Unit]
+Description=CT337 backup
+After=network-online.target autonomy337-repository.service
+RequiresMountsFor=/mnt/autonomy337-backups
+[Service]
+Type=oneshot
+User=a337backup
+ExecStart=/usr/bin/python3 -I /opt/autonomy337/autonomy.py backup --config /etc/autonomy337/backup/config.json
+TimeoutStartSec=3600
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/a337backup 
+LimitCORE=0

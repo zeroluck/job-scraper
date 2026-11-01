@@ -1,0 +1,15 @@
+[Unit]
+Description=Initial globals backup inside exact collector isolation
+[Service]
+Type=oneshot
+User=a337backup
+ExecStartPre=/usr/bin/python3 -I /opt/autonomy337/collector_boundary.py
+ExecStart=/usr/bin/python3 -I /opt/autonomy337/autonomy.py backup --config /etc/autonomy337/backup/globals.json
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+InaccessiblePaths=/mnt/autonomy337-backups /etc/autonomy337/retention /etc/autonomy337/repo /var/lib/a337issuer
+ReadWritePaths=/var/lib/a337backup-globals
+UMask=0077

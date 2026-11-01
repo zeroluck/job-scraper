@@ -1,0 +1,21 @@
+Host backup337
+    HostName REPLACE_WITH_APPROVED_BACKUP_TRANSPORT_HOST
+    User REPLACE_WITH_FORCED_BACKUP_PRINCIPAL
+    IdentityFile /etc/autonomy337/backup_ed25519
+
+Host issuer337-runner
+    HostName REPLACE_WITH_APPROVED_ISSUER_TRANSPORT_HOST
+    User REPLACE_WITH_FORCED_RUNNER_ISSUER_PRINCIPAL
+    IdentityFile /etc/autonomy337/runner_issuer_ed25519
+
+Host *
+    BatchMode yes
+    StrictHostKeyChecking yes
+    UserKnownHostsFile /etc/autonomy337/known_hosts
+    IdentitiesOnly yes
+    ConnectTimeout 15
+    ServerAliveInterval 15
+    ServerAliveCountMax 2
+    RequestTTY no
+    ForwardAgent no
+    ClearAllForwardings yes

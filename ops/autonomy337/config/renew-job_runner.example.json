@@ -1,0 +1,19 @@
+{
+  "state": "/var/lib/autonomy337",
+  "role": "job_runner",
+  "public_key": "/etc/autonomy337/prepared-signing-public.pem",
+  "timeout": 180,
+  "issue": [
+    "/usr/bin/ssh",
+    "-F",
+    "/etc/autonomy337/ssh_config",
+    "issuer337-runner",
+    "issue"
+  ],
+  "install": [
+    "/usr/local/libexec/autonomy337-parent-install-runner"
+  ],
+  "verify": [
+    "/usr/local/libexec/autonomy337-parent-verify-running-runner"
+  ]
+}

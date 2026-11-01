@@ -1,0 +1,11 @@
+[Unit]
+Description=CT337 backup durable schedule
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+Unit=autonomy337@backup.service
+
+[Install]
+WantedBy=timers.target

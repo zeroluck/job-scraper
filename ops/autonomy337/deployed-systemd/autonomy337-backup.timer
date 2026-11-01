@@ -1,0 +1,8 @@
+[Unit]
+Description=CT337 scheduled backup
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=yes
+RandomizedDelaySec=300
+[Install]
+WantedBy=timers.target

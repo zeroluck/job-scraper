@@ -1,0 +1,18 @@
+-- REVIEW TEMPLATE ONLY. Run while connected to the approved database, using
+-- psql -v database=EXACT_APPROVED_DATABASE. This file is never auto-applied.
+\set ON_ERROR_STOP on
+BEGIN;
+CREATE ROLE job_backup LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION
+  BYPASSRLS PASSWORD NULL;
+ALTER ROLE job_backup SET default_transaction_read_only = on;
+GRANT CONNECT ON DATABASE :"database" TO job_backup;
+GRANT USAGE ON SCHEMA public, auth, extensions TO job_backup;
+GRANT SELECT ON ALL TABLES IN SCHEMA public, auth, extensions TO job_backup;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public, auth, extensions TO job_backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_control_system() TO job_backup;
+COMMIT;
+-- Add matching default SELECT privileges for EVERY actual object-creating owner.
+-- Do not use pg_read_all_data: it grants access in unrelated databases.
+-- BYPASSRLS is needed for a complete dump, but does not confer table privileges.
+-- Peer-map only the dedicated guest backup OS user to job_backup; no TCP login.
+-- Revoke any inherited/public write or CREATE grants before qualification.

@@ -1,0 +1,8 @@
+[Unit]
+Description=Six-hour isolated token renewal qualification (NOT consumer installation)
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:20:00 UTC
+Persistent=yes
+RandomizedDelaySec=60
+[Install]
+WantedBy=timers.target

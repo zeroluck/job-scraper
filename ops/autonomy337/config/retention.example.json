@@ -1,0 +1,14 @@
+{
+  "state": "/var/lib/autonomy337",
+  "restic": "/usr/local/bin/restic",
+  "restic_env": {
+    "RESTIC_REPOSITORY": "REPLACE_WITH_OFFHOST_REPOSITORY",
+    "RESTIC_PASSWORD_FILE": "/etc/autonomy337/repository.password"
+  },
+  "timeout": 3600,
+  "keep_last": 14,
+  "keep_daily": 30,
+  "keep_weekly": 12,
+  "max_backup_age": 93600,
+  "prune": true
+}

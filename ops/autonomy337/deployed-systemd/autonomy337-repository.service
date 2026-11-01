@@ -1,0 +1,18 @@
+[Unit]
+Description=Append-only encrypted NAS backup endpoint
+After=network-online.target
+RequiresMountsFor=/mnt/autonomy337-backups
+[Service]
+User=a337repo
+Group=a337repo
+ExecStart=/usr/bin/restic-rest-server --listen 127.0.0.1:18737 --path /mnt/autonomy337-backups/repository --append-only --htpasswd-file /etc/autonomy337/repo/users.htpasswd
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/mnt/autonomy337-backups/repository
+UMask=0077
+[Install]
+WantedBy=multi-user.target

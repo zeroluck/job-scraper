@@ -1,0 +1,16 @@
+[Unit]
+Description=CT337 retention
+After=network-online.target autonomy337-repository.service
+RequiresMountsFor=/mnt/autonomy337-backups
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 -I /opt/autonomy337/autonomy.py retention --config /etc/autonomy337/retention/config.json
+TimeoutStartSec=3600
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/a337backup /mnt/autonomy337-backups/repository
+LimitCORE=0

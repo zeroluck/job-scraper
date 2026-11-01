@@ -1,0 +1,35 @@
+{
+  "state": "/var/lib/autonomy337",
+  "timeout": 60,
+  "checks": [
+    {
+      "path": "/var/lib/autonomy337/latest-backup.json",
+      "max_age": 93600
+    },
+    {
+      "path": "/var/lib/autonomy337/renew-job_runner.json",
+      "max_age": 25200,
+      "min_remaining": 21600
+    },
+    {
+      "path": "/var/lib/autonomy337/restore-drill.json",
+      "max_age": 2678400
+    }
+  ],
+  "statuses": [
+    {"path": "/var/lib/autonomy337/status-backup.json", "max_age": 93600},
+    {"path": "/var/lib/autonomy337/status-renew-job_runner.json", "max_age": 25200},
+    {"path": "/var/lib/autonomy337/status-retention.json", "max_age": 691200}
+  ],
+  "probes": [
+    [
+      "/usr/local/libexec/autonomy337-parent-probe-job-freshness"
+    ],
+    [
+      "/usr/local/libexec/autonomy337-parent-probe-api-auth-and-web"
+    ]
+  ],
+  "notify": [
+    "/usr/local/libexec/autonomy337-parent-deliver-heartbeat"
+  ]
+}

@@ -1,0 +1,21 @@
+[Unit]
+Description=CT337 bounded %i credential renewal
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=autonomy337
+Group=autonomy337
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/autonomy337/autonomy.py renew --config /etc/autonomy337/renew-%i.json
+TimeoutStartSec=10min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/autonomy337
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal

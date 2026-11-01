@@ -1,0 +1,17 @@
+[Unit]
+Description=Isolated non-production renewal stage for job_runner
+After=network-online.target
+[Service]
+Type=oneshot
+User=a337issuer
+ExecStart=/usr/bin/python3 -I /opt/autonomy337/autonomy.py renew --config /etc/autonomy337/issuer/job_runner.json
+TimeoutStartSec=180
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/a337issuer
+InaccessiblePaths=/mnt/autonomy337-backups /etc/autonomy337/retention /etc/autonomy337/repo /etc/autonomy337/backup
+LimitCORE=0

@@ -1,0 +1,11 @@
+[Unit]
+Description=Isolated full PG17.11 restore from encrypted NAS backup
+After=network-online.target docker.service
+Requires=docker.service
+RequiresMountsFor=/mnt/autonomy337-backups
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /opt/autonomy337/restore_drill.py /etc/autonomy337/retention/restore.json
+TimeoutStartSec=1800
+UMask=0077
+LimitCORE=0

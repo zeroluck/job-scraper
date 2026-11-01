@@ -1,0 +1,11 @@
+[Unit]
+Description=CT337 renew-job_runner durable schedule
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+Unit=autonomy337-renew@job_runner.service
+
+[Install]
+WantedBy=timers.target

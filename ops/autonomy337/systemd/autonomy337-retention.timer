@@ -1,0 +1,11 @@
+[Unit]
+Description=CT337 retention durable schedule
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+Unit=autonomy337@retention.service
+
+[Install]
+WantedBy=timers.target

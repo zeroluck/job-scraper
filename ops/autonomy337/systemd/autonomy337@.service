@@ -1,0 +1,21 @@
+[Unit]
+Description=CT337 unattended %i (off-host collector)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=autonomy337
+Group=autonomy337
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/autonomy337/autonomy.py %i --config /etc/autonomy337/%i.json
+TimeoutStartSec=3h
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/autonomy337
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal

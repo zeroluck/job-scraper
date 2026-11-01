@@ -1,0 +1,4 @@
+{
+  "role": "job_runner",
+  "private_key": "/etc/jobs-postgrest/prepared-signing.pem"
+}

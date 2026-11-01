@@ -1,0 +1,8 @@
+[Unit]
+Description=CT337 five-minute operational monitoring
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=300
+AccuracySec=15
+[Install]
+WantedBy=timers.target

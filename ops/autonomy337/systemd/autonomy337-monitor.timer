@@ -1,0 +1,11 @@
+[Unit]
+Description=CT337 monitor durable schedule
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+Unit=autonomy337@monitor.service
+
+[Install]
+WantedBy=timers.target

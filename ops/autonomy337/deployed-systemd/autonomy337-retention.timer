@@ -1,0 +1,8 @@
+[Unit]
+Description=CT337 scheduled retention
+[Timer]
+OnCalendar=Sun *-*-* 05:00:00 UTC
+Persistent=yes
+RandomizedDelaySec=300
+[Install]
+WantedBy=timers.target
