@@ -6,6 +6,16 @@ on:
     types: [completed]
   workflow_dispatch:
     inputs:
+      qualification:
+        description: "REAL bounded qualification writes; requires one canonical archetype"
+        required: false
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Required canonical lane for bounded qualification"
+        required: false
+        type: string
+        default: ""
       archetype:
         description: "Archetype to analyze insights for"
         required: false
@@ -54,6 +64,8 @@ jobs:
 
       - name: Run job insights analysis
         env:
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY || secrets.GEMINI_FIRST_API_KEY }}
@@ -63,4 +75,9 @@ jobs:
           JOB_INSIGHTS_ARCHETYPE: ${{ github.event.inputs.archetype || '' }}
           JOB_INSIGHTS_BACKFILL_ALL: ${{ github.event.inputs.drain_backlog || 'false' }}
           JOB_INSIGHTS_REPLACEMENT_BACKFILL: ${{ github.event.inputs.replacement_backfill || 'false' }}
-        run: python analyze_jobs.py
+        run: |
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow analyze_jobs
+          else
+            python analyze_jobs.py
+          fi

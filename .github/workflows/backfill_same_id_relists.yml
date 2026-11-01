@@ -3,6 +3,16 @@ name: Backfill Same-ID Relists
 on:
   workflow_dispatch:
     inputs:
+      qualification:
+        description: "REAL bounded qualification writes; requires one canonical archetype"
+        required: false
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Required canonical lane for bounded qualification"
+        required: false
+        type: string
+        default: ""
       limit:
         description: "Maximum canonical jobs to inspect"
         required: false
@@ -43,14 +53,20 @@ jobs:
 
       - name: Repair same-ID relist lower bounds
         env:
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          limit="${{ inputs.limit }}"
-          case "$limit" in
-            100|500|1000|5000) ;;
-            *) echo "Invalid limit: $limit" >&2; exit 2 ;;
-          esac
-          args=(--limit "$limit")
-          if [[ "${{ inputs.apply }}" == "true" ]]; then args+=(--apply); fi
-          python backfill_same_id_relists.py "${args[@]}"
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow backfill_same_id_relists
+          else
+            limit="${{ inputs.limit }}"
+            case "$limit" in
+              100|500|1000|5000) ;;
+              *) echo "Invalid limit: $limit" >&2; exit 2 ;;
+            esac
+            args=(--limit "$limit")
+            if [[ "${{ inputs.apply }}" == "true" ]]; then args+=(--apply); fi
+            python backfill_same_id_relists.py "${args[@]}"
+          fi

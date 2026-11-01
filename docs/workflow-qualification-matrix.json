@@ -1,0 +1,710 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-11-01T06:00:17.676289+00:00",
+  "repository": "zeroluck/job-scraper",
+  "observed_main_sha": "79ec5dba9af701c0435d71637f6b506b7145f2d2",
+  "requested_workflow_count": 13,
+  "actual_registered_workflow_count": 12,
+  "count_discrepancy": "GitHub API total_count=12: 3 active plus 9 disabled_manually. No thirteenth workflow was fabricated.",
+  "policy": "READ-ONLY GitHub inventory only. No enables, dispatches, pushes, target mutations or deployment actions performed. Commands are gated future instructions, not run receipts.",
+  "common_llm_envelope": "Qualification subprocess wraps actual litellm.completion: <=2 invocations including errors, num_retries=0, <=4096 output tokens/attempt, <=50000 serialized message characters, <=30s provider timeout. A 300-second process deadline exits even through ordinary Exception handlers; inspect interrupted claims before retry. This is an attempt/token envelope, not a dollar guarantee.",
+  "workflow_count": 12,
+  "workflows": [
+    {
+      "id": 380140525,
+      "name": "migration-drift",
+      "path": ".github/workflows/migration_drift.yml",
+      "state": "active",
+      "source_on_main": true,
+      "current_dispatch_inputs": {},
+      "latest_observed_runs": [
+        {
+          "id": 38009479168,
+          "head_sha": "97641d7e8c41f4ed5dd255452a80213a84a94ff5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "push"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "existing_manual_read_only",
+      "qualification_inputs": {},
+      "command_after_release_and_parent_authorization": "gh workflow run migration_drift.yml --repo zeroluck/job-scraper --ref main",
+      "limits": {
+        "timeout_minutes": 15,
+        "mutations": 0
+      },
+      "expected_persistent_outcomes": [
+        "No database mutation; migration drift command and SQL setup tests pass against checked-out web master."
+      ],
+      "blockers": []
+    },
+    {
+      "id": 403167574,
+      "name": "Jobs private CA qualification",
+      "path": ".github/workflows/jobs_private_ca_qualification.yml",
+      "state": "active",
+      "source_on_main": false,
+      "current_dispatch_inputs": {},
+      "latest_observed_runs": [
+        {
+          "id": 41256576568,
+          "head_sha": "9e8e24e36ddb88ef9d0ec6f05ef2f8cb08b23bc5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "push"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "historical_branch_push_only",
+      "qualification_inputs": null,
+      "command_after_release_and_parent_authorization": null,
+      "source_ref": "9e8e24e36ddb88ef9d0ec6f05ef2f8cb08b23bc5",
+      "source_branch": "qualification/jobs-private-ca-20261101",
+      "limits": {
+        "timeout_minutes": 5,
+        "row_reads": 0,
+        "mutations": 0
+      },
+      "expected_persistent_outcomes": [
+        "No database/storage changes. Trusted curl/Python/Node reads succeed; missing/invalid token rejected; untrusted CA and hostname mismatch rejected."
+      ],
+      "blockers": [
+        "Workflow registration is active but file does not exist on main and historical source has no workflow_dispatch.",
+        "Do not claim gh workflow run works for this workflow. Restore a reviewed manual-only definition before a new qualification; do not push merely to retrigger."
+      ]
+    },
+    {
+      "id": 403179052,
+      "name": "Private Data API SDK Qualification",
+      "path": ".github/workflows/private_data_api_sdk.yml",
+      "state": "active",
+      "source_on_main": true,
+      "current_dispatch_inputs": {},
+      "latest_observed_runs": [
+        {
+          "id": 41259989010,
+          "head_sha": "79ec5dba9af701c0435d71637f6b506b7145f2d2",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "workflow_dispatch"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "existing_manual_read_only",
+      "qualification_inputs": {},
+      "command_after_release_and_parent_authorization": "gh workflow run private_data_api_sdk.yml --repo zeroluck/job-scraper --ref main",
+      "limits": {
+        "timeout_minutes": 5,
+        "mutations": 0
+      },
+      "expected_persistent_outcomes": [
+        "No target mutation; signed SDK table GET plus read-only configuration RPC pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": 236353264,
+      "name": "Resume Customization",
+      "path": ".github/workflows/hourly_resume_customization.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "archetype": {
+          "description": "Optional single canonical lane; blank processes all enabled lanes",
+          "required": false,
+          "default": "",
+          "type": "string"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 32541724948,
+          "head_sha": "c29b8af1ca8868760cd60bd5cf9e9a537ce1e0ac",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "schedule"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run hourly_resume_customization.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "jobs": 1,
+        "storage_uploads": 1,
+        "llm_attempts": 2,
+        "max_output_tokens_per_attempt": 4096
+      },
+      "expected_persistent_outcomes": [
+        "One customized PDF is a necessary intended artifact; customized_resumes metadata and lane resume link/state agree.",
+        "Owner-checked claim clears on completion; download the exact resulting object and verify PDF bytes. No notification call exists in this entrypoint."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "job_archetype_memberships",
+          "customized_resumes"
+        ],
+        "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'customized_resumes' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.customized_resumes t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    },
+    {
+      "id": 236353265,
+      "name": "Daily Job Manager",
+      "path": ".github/workflows/job_manager.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {},
+      "latest_observed_runs": [
+        {
+          "id": 41238608063,
+          "head_sha": "97641d7e8c41f4ed5dd255452a80213a84a94ff5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "schedule"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "missing",
+      "qualification_inputs": null,
+      "command_after_release_and_parent_authorization": null,
+      "limits": {
+        "bulk_expiry_bounded": false,
+        "llm_attempts": 0
+      },
+      "expected_persistent_outcomes": [
+        "Expiry updates job_state/is_active for old eligible rows; activity check updates last_checked or marks removed; request grants finish.",
+        "Protected applied/offer/interviewing rows and deletion remain unchanged."
+      ],
+      "blockers": [
+        "No workflow dispatch inputs; main invokes unbounded mark_expired_jobs before bounded activity checking.",
+        "Confirmed baseline failure: response_text_lower is undefined in activity content handling.",
+        "Needs scoped expiry/activity selection plus explicit cap and failure propagation before real qualification."
+      ]
+    },
+    {
+      "id": 236353266,
+      "name": "Parse Resume Manually",
+      "path": ".github/workflows/parse_resume.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "archetype": {
+          "description": "Canonical lane, all enabled lanes, or global legacy resume",
+          "required": true,
+          "default": "all",
+          "type": "choice",
+          "options": [
+            "all",
+            "technology_delivery",
+            "systems_platform_ops",
+            "network_infrastructure",
+            "datacenter_operations",
+            "ai_workflow_automation",
+            "building_controls",
+            "global"
+          ]
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 34685990069,
+          "head_sha": "fdc055309c38969a4ade7b646b2f4b6ac3d6a1f5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "workflow_dispatch"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run parse_resume.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "lane_profiles": 1,
+        "storage_downloads": 1,
+        "storage_uploads": 0,
+        "llm_attempts": 2,
+        "max_output_tokens_per_attempt": 4096
+      },
+      "expected_persistent_outcomes": [
+        "One archetype_resume_profiles row updates from its existing lane PDF.",
+        "Global base_resume and other lanes unchanged; source Storage read-only."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "archetype_resume_profiles",
+          "base_resume"
+        ],
+        "fingerprint_sql": "SELECT 'archetype_resume_profiles' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.archetype_resume_profiles t WHERE coalesce(to_jsonb(t)->>'archetype','') in (:'lane','');\nSELECT 'base_resume' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.base_resume t WHERE coalesce(to_jsonb(t)->>'archetype','') in (:'lane','');",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    },
+    {
+      "id": 236353268,
+      "name": "Job Scorer",
+      "path": ".github/workflows/score_jobs.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "jobs_per_run": {
+          "description": "Number of jobs to score in this run (overrides JOBS_TO_SCORE_PER_RUN)",
+          "required": false,
+          "default": "50",
+          "type": "number"
+        },
+        "archetype": {
+          "description": "Optional single canonical lane; blank processes all enabled lanes",
+          "required": false,
+          "default": "",
+          "type": "string"
+        },
+        "drain_backlog": {
+          "description": "Run bounded repeated passes until queues empty or time budget is reached",
+          "required": false,
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 41224040963,
+          "head_sha": "97641d7e8c41f4ed5dd255452a80213a84a94ff5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "schedule"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run score_jobs.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "initial_claims": 1,
+        "custom_rescore_claims": 1,
+        "llm_attempts": 2,
+        "max_output_tokens_per_attempt": 4096
+      },
+      "expected_persistent_outcomes": [
+        "Up to two owner-checked claim completions in one canonical lane.",
+        "Membership score/stage changes, claim owners clear; failed attempts release claims. No global filter prepass."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "job_archetype_memberships"
+        ],
+        "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    },
+    {
+      "id": 236353269,
+      "name": "Hourly Job Publication Pipeline",
+      "path": ".github/workflows/scrape_jobs.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "lookback_hours": {
+          "description": "LinkedIn posted-time lookback; use 96 for missed-run recovery",
+          "required": false,
+          "default": "48",
+          "type": "choice",
+          "options": [
+            "24",
+            "48",
+            "72",
+            "96",
+            "168"
+          ]
+        },
+        "archetype": {
+          "description": "Optional single canonical lane for manual recovery; blank scrapes all enabled lanes",
+          "required": false,
+          "default": "",
+          "type": "string"
+        },
+        "reset_linkedin_circuit": {
+          "description": "Close an open circuit after verifying its trigger was a false positive",
+          "required": false,
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 41245020067,
+          "head_sha": "97641d7e8c41f4ed5dd255452a80213a84a94ff5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "schedule"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "missing",
+      "qualification_inputs": null,
+      "command_after_release_and_parent_authorization": null,
+      "least_scope_existing_inputs": {
+        "lookback_hours": "24",
+        "archetype": "technology_delivery",
+        "reset_linkedin_circuit": "false"
+      },
+      "limits": {
+        "scrape_job_timeout_minutes": 40,
+        "classification_job_timeout_minutes": 45,
+        "gate_job_timeout_minutes": 5,
+        "bounded_rows": false
+      },
+      "expected_persistent_outcomes": [
+        "Real adaptive discovery cycle/tasks, request grants, listing observations/content/relist states, canonical jobs and lane memberships persist.",
+        "Full pipeline additionally performs compatibility, publication generation/watermark finalization and gate watchdog issue writes."
+      ],
+      "blockers": [
+        "No hard one-task/one-result qualification dispatch mode. A lane limits lanes, not rows/tasks.",
+        "Single-lane dispatch SKIPS compatibility, publication_gate and watchdog: it cannot qualify the entire workflow.",
+        "Full pipeline currently allows GitHub issue notifications; qualification must suppress watchdog while preserving publication acceptance.",
+        "Source publication must not change until initial native FreeHire pull acceptance."
+      ]
+    },
+    {
+      "id": 244819409,
+      "name": "Analyze Job Insights",
+      "path": ".github/workflows/analyze_jobs.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "archetype": {
+          "description": "Archetype to analyze insights for",
+          "required": false,
+          "default": ""
+        },
+        "drain_backlog": {
+          "description": "Continue processing until no unanalyzed jobs remain",
+          "required": false,
+          "default": "false"
+        },
+        "replacement_backfill": {
+          "description": "Reanalyze previously analyzed jobs once",
+          "required": false,
+          "default": "false"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 41245219015,
+          "head_sha": "97641d7e8c41f4ed5dd255452a80213a84a94ff5",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "workflow_run"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run analyze_jobs.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "jobs": 1,
+        "llm_attempts": 2,
+        "max_output_tokens_per_attempt": 4096
+      },
+      "expected_persistent_outcomes": [
+        "One lane membership analyzed_at and updated_at advance only after successful extraction.",
+        "job_keyword_facts replacement and keyword_insights refresh reflect the same job/lane; aggregates can affect more than one aggregate row."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "job_archetype_memberships",
+          "job_keyword_facts",
+          "keyword_insights"
+        ],
+        "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'job_keyword_facts' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_keyword_facts t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'keyword_insights' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.keyword_insights t WHERE to_jsonb(t)->>'archetype' = :'lane';",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    },
+    {
+      "id": 340231398,
+      "name": "Backfill LinkedIn Metadata",
+      "path": ".github/workflows/backfill_linkedin_metadata.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "limit": {
+          "description": "Maximum LinkedIn detail pages to check",
+          "required": false,
+          "default": "500"
+        },
+        "apply": {
+          "description": "Persist recovered metadata",
+          "required": false,
+          "default": "false"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 32599540837,
+          "head_sha": "31079aee480bbb18fc1de14185b9e5ad8e42457e",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "workflow_dispatch"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run backfill_linkedin_metadata.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "canonical_candidates": 1,
+        "apply": true,
+        "llm_attempts": 0
+      },
+      "expected_persistent_outcomes": [
+        "One selected canonical row receives recovered detail metadata/listing instance updates if the upstream page is available.",
+        "Read job metadata, listing_instances and posting-wave fields back; unavailable detail is NOT successful write qualification."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "jobs"
+        ],
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    },
+    {
+      "id": 343823098,
+      "name": "Backfill Same-ID Relists",
+      "path": ".github/workflows/backfill_same_id_relists.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "limit": {
+          "description": "Maximum canonical jobs to inspect",
+          "required": false,
+          "default": "500",
+          "type": "choice",
+          "options": [
+            "100",
+            "500",
+            "1000",
+            "5000"
+          ]
+        },
+        "apply": {
+          "description": "Persist reviewed lower-bound relist repairs",
+          "required": false,
+          "default": "false",
+          "type": "boolean"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 33133018285,
+          "head_sha": "59935eed601124603ac0cb38b86b10b38307f7ed",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "workflow_dispatch"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run backfill_same_id_relists.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "canonical_candidates": 1,
+        "archive_scan_rows_max": 1000,
+        "apply": true,
+        "llm_attempts": 0
+      },
+      "expected_persistent_outcomes": [
+        "At most one canonical job is repaired; selected-job observation/content/relist tables may have several child writes.",
+        "Read same_id_relist_count, posting_wave_count, repost_count and related historical evidence back; second run must produce no additional repairs."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "jobs",
+          "listing_content_versions",
+          "listing_observations",
+          "listing_relist_events"
+        ],
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_content_versions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_content_versions t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_observations' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_observations t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_relist_events' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_relist_events t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    },
+    {
+      "id": 343823100,
+      "name": "Manual Freehire Compatibility Recovery",
+      "path": ".github/workflows/freehire_compat.yml",
+      "state": "disabled_manually",
+      "source_on_main": true,
+      "current_dispatch_inputs": {
+        "limit": {
+          "description": "Jobs fetched per batched Supabase page",
+          "required": true,
+          "default": "500",
+          "type": "choice",
+          "options": [
+            "100",
+            "300",
+            "500",
+            "1000"
+          ]
+        },
+        "apply": {
+          "description": "Persist changes (false performs a dry run)",
+          "required": true,
+          "default": false,
+          "type": "boolean"
+        },
+        "drain_backlog": {
+          "description": "Continue fetching batches until no eligible work remains",
+          "required": true,
+          "default": true,
+          "type": "boolean"
+        },
+        "replacement_backfill": {
+          "description": "Reclassify current rows older than replacement_before",
+          "required": true,
+          "default": false,
+          "type": "boolean"
+        },
+        "replacement_before": {
+          "description": "Stable ISO-8601 cutoff; required for resumable replacement runs",
+          "required": false,
+          "type": "string"
+        }
+      },
+      "latest_observed_runs": [
+        {
+          "id": 34080141581,
+          "head_sha": "f94ca492edaeb28e9b22034ff05ca0f81e0fe338",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "workflow_dispatch"
+        }
+      ],
+      "executed_by_this_task": false,
+      "can_dispatch_now": false,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery"
+      },
+      "command_after_release_and_parent_authorization": "gh workflow run freehire_compat.yml --repo zeroluck/job-scraper --ref main -f qualification=true -f qualification_archetype=technology_delivery",
+      "limits": {
+        "candidate_rows": 1,
+        "drain_backlog": false,
+        "replacement_backfill": false,
+        "llm_attempts": 2,
+        "max_output_tokens_per_attempt": 4096
+      },
+      "expected_persistent_outcomes": [
+        "One candidate jobs row receives CAS/owner-checked compatibility classification or deterministic metadata update.",
+        "freehire_compat_status/hash/schema/import hash and remote evidence agree; claim not left processing. No downstream FreeHire pull is triggered."
+      ],
+      "readback": {
+        "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
+        "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
+        "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
+        "tables": [
+          "jobs"
+        ],
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+      },
+      "blockers": [
+        "Parent target-promotion identity proof and explicit writer authorization required.",
+        "Publish reviewed qualification source to main before this dispatch command exists.",
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
+      ]
+    }
+  ],
+  "local_verification": {
+    "focused": "106 passed, 4 SDK deprecation warnings",
+    "full_changed": "524 passed, 7 failed, 16 SDK deprecation warnings",
+    "full_baseline": "512 passed, same 7 failed, 16 SDK deprecation warnings",
+    "qualification_shell_blocks_bash_n": 7,
+    "diff_check": "passed"
+  }
+}

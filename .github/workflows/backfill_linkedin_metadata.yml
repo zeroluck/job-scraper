@@ -3,6 +3,16 @@ name: Backfill LinkedIn Metadata
 on:
   workflow_dispatch:
     inputs:
+      qualification:
+        description: "REAL bounded qualification writes; requires one canonical archetype"
+        required: false
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Required canonical lane for bounded qualification"
+        required: false
+        type: string
+        default: ""
       limit:
         description: "Maximum LinkedIn detail pages to check"
         required: false
@@ -37,9 +47,13 @@ jobs:
 
       - name: Backfill available LinkedIn detail metadata
         env:
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: >-
-          python backfill_linkedin_metadata.py
-          --limit "${{ inputs.limit }}"
-          ${{ inputs.apply == 'true' && '--apply' || '' }}
+        run: |
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow backfill_linkedin_metadata
+          else
+            python backfill_linkedin_metadata.py --limit "${{ inputs.limit }}" ${{ inputs.apply == 'true' && '--apply' || '' }}
+          fi

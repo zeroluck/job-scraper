@@ -3,6 +3,16 @@ name: Manual Freehire Compatibility Recovery
 on:
   workflow_dispatch:
     inputs:
+      qualification:
+        description: "REAL bounded qualification writes; requires one canonical archetype"
+        required: false
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Required canonical lane for bounded qualification"
+        required: false
+        type: string
+        default: ""
       limit:
         description: "Jobs fetched per batched Supabase page"
         required: true
@@ -58,6 +68,8 @@ jobs:
 
       - name: Run compatibility recovery
         env:
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY || secrets.GEMINI_FIRST_API_KEY }}
@@ -70,22 +82,26 @@ jobs:
           FREEHIRE_REPLACEMENT_BACKFILL: ${{ inputs.replacement_backfill }}
           FREEHIRE_REPLACEMENT_BEFORE: ${{ inputs.replacement_before }}
         run: |
-          case "$FREEHIRE_CLASSIFY_LIMIT" in
-            100|300|500|1000) ;;
-            *) echo "Invalid FREEHIRE_CLASSIFY_LIMIT: $FREEHIRE_CLASSIFY_LIMIT" >&2; exit 2 ;;
-          esac
-          case "$FREEHIRE_APPLY" in
-            true|false) ;;
-            *) echo "Invalid FREEHIRE_APPLY: $FREEHIRE_APPLY" >&2; exit 2 ;;
-          esac
-          args=(--limit "$FREEHIRE_CLASSIFY_LIMIT")
-          if [[ "$FREEHIRE_APPLY" == "true" ]]; then args+=(--apply); fi
-          if [[ "$FREEHIRE_DRAIN_BACKLOG" == "true" ]]; then args+=(--drain-backlog); fi
-          if [[ "$FREEHIRE_REPLACEMENT_BACKFILL" == "true" ]]; then
-            if [[ -z "$FREEHIRE_REPLACEMENT_BEFORE" ]]; then
-              echo "replacement_before is required for replacement_backfill" >&2
-              exit 2
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow freehire_compat
+          else
+            case "$FREEHIRE_CLASSIFY_LIMIT" in
+              100|300|500|1000) ;;
+              *) echo "Invalid FREEHIRE_CLASSIFY_LIMIT: $FREEHIRE_CLASSIFY_LIMIT" >&2; exit 2 ;;
+            esac
+            case "$FREEHIRE_APPLY" in
+              true|false) ;;
+              *) echo "Invalid FREEHIRE_APPLY: $FREEHIRE_APPLY" >&2; exit 2 ;;
+            esac
+            args=(--limit "$FREEHIRE_CLASSIFY_LIMIT")
+            if [[ "$FREEHIRE_APPLY" == "true" ]]; then args+=(--apply); fi
+            if [[ "$FREEHIRE_DRAIN_BACKLOG" == "true" ]]; then args+=(--drain-backlog); fi
+            if [[ "$FREEHIRE_REPLACEMENT_BACKFILL" == "true" ]]; then
+              if [[ -z "$FREEHIRE_REPLACEMENT_BEFORE" ]]; then
+                echo "replacement_before is required for replacement_backfill" >&2
+                exit 2
+              fi
+              args+=(--replacement-backfill --replacement-before "$FREEHIRE_REPLACEMENT_BEFORE")
             fi
-            args+=(--replacement-backfill --replacement-before "$FREEHIRE_REPLACEMENT_BEFORE")
+            python backfill_freehire_compat.py "${args[@]}"
           fi
-          python backfill_freehire_compat.py "${args[@]}"

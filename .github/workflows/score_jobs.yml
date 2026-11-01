@@ -8,6 +8,16 @@ on:
       timezone: "America/New_York"
   workflow_dispatch: # Allows manual triggering from the Actions tab
     inputs:
+      qualification:
+        description: "REAL bounded qualification writes; requires one canonical archetype"
+        required: false
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Required canonical lane for bounded qualification"
+        required: false
+        type: string
+        default: ""
       jobs_per_run:
         description: "Number of jobs to score in this run (overrides JOBS_TO_SCORE_PER_RUN)"
         required: false
@@ -56,6 +66,8 @@ jobs:
 
       - name: Run job scoring script
         env:
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # LLM Configuration (set via Repository Variables / Secrets)
@@ -66,4 +78,9 @@ jobs:
           JOBS_TO_SCORE_PER_RUN: ${{ inputs.jobs_per_run || '50' }}
           JOB_SCORE_ARCHETYPE: ${{ inputs.archetype || '' }}
           JOB_SCORE_DRAIN_BACKLOG: ${{ inputs.drain_backlog || 'false' }}
-        run: python score_jobs.py # Execute the job scoring script
+        run: |
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow score_jobs
+          else
+            python score_jobs.py # Execute the job scoring script
+          fi

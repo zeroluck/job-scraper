@@ -3,6 +3,16 @@ name: Resume Customization
 on:
   workflow_dispatch:
     inputs:
+      qualification:
+        description: "REAL bounded qualification writes; requires one canonical archetype"
+        required: false
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Required canonical lane for bounded qualification"
+        required: false
+        type: string
+        default: ""
       archetype:
         description: "Optional single canonical lane; blank processes all enabled lanes"
         required: false
@@ -43,6 +53,8 @@ jobs:
 
       - name: Run resume customization script
         env:
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # LLM Configuration (set via Repository Variables / Secrets)
@@ -51,4 +63,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JOB_RESUME_ARCHETYPE: ${{ inputs.archetype || '' }}
-        run: python custom_resume_generator.py
+        run: |
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow hourly_resume_customization
+          else
+            python custom_resume_generator.py
+          fi
