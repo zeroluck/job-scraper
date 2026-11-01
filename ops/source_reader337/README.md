@@ -64,7 +64,8 @@ before creating the migration.
 
 The gate creates uniquely named disposable Docker resources, never connects to
 production, publishes only the API on a random loopback port and exposes no
-PostgreSQL host port. Fixture-only JWT material is generated in memory, never
+PostgreSQL host port. Database files use tmpfs, checked to exclude persistent
+volume mounts. Fixture-only JWT material is generated in memory, never
 printed or persisted, and removed with its container. Its isolated bridge is not
 an egress firewall. Resources are removed and their absence verified before a
 PASS receipt is written. The receipt records image IDs and artifact hashes.
