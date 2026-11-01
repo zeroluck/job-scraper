@@ -1,0 +1,61 @@
+name: Jobs private CA qualification
+on:
+  push:
+    branches: [qualification/jobs-private-ca-20261101]
+permissions:
+  contents: read
+jobs:
+  tls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      JOBS_TLS_QUALIFICATION_JWT: ${{ secrets.JOBS_TLS_QUALIFICATION_JWT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify CA fingerprint and health with curl
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '9a7518dc339e10b5f2e23d023ba8205f2985f131faf1eceefe781930cf5c04c6  migration/precutover337/jobs-private-root.crt' | sha256sum -c -
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 25 --cacert migration/precutover337/jobs-private-root.crt https://pgsql.jdb.l.cd/healthz
+      - name: Python verified TLS and signed API positive/negative checks
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,ssl,socket,urllib.request,urllib.error
+          host='pgsql.jdb.l.cd'
+          ca='migration/precutover337/jobs-private-root.crt'
+          endpoint='https://'+host+'/rest/v1/jobs?select=job_id&limit=0'
+          trusted=ssl.create_default_context(cafile=ca)
+          def request(token=None,context=trusted):
+              headers={} if token is None else {'Authorization':'Bearer '+token}
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(endpoint,headers=headers),context=context,timeout=20) as r:
+                      return r.status,r.read()
+              except urllib.error.HTTPError as e:
+                  return e.code,e.read()
+          status,body=request(os.environ['JOBS_TLS_QUALIFICATION_JWT']);assert status==200 and json.loads(body)==[]
+          assert request()[0]==401
+          assert request('invalid.qualification.token')[0]==401
+          try:request(context=ssl.create_default_context())
+          except urllib.error.URLError as e:assert isinstance(e.reason,ssl.SSLCertVerificationError)
+          else:raise AssertionError('untrusted CA accepted')
+          try:
+              with socket.create_connection((host,443),timeout=15) as s:
+                  with trusted.wrap_socket(s,server_hostname='wrong-host.invalid'):pass
+          except ssl.SSLCertVerificationError:pass
+          else:raise AssertionError('wrong hostname accepted')
+          print('Python: trusted signed read200; missing/invalid JWT401; untrusted CA rejected; hostname mismatch rejected')
+          PY
+      - name: Node trusts only added public CA and verifies signed read
+        env:
+          NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/migration/precutover337/jobs-private-root.crt
+        run: |
+          node --input-type=module <<'JS'
+          const url='https://pgsql.jdb.l.cd/rest/v1/jobs?select=job_id&limit=0';
+          const r=await fetch(url,{headers:{Authorization:'Bearer '+process.env.JOBS_TLS_QUALIFICATION_JWT},signal:AbortSignal.timeout(20000)});
+          if(r.status!==200 || JSON.stringify(await r.json())!=='[]')throw new Error('signed read failed');
+          const denied=await fetch(url,{signal:AbortSignal.timeout(20000)});
+          if(denied.status!==401)throw new Error('unauthenticated request accepted');
+          console.log('Node: private CA trusted, signed read200, unauthenticated401');
+          JS
