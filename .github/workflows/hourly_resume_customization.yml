@@ -15,6 +15,10 @@ concurrency:
 
 jobs:
   customize_resumes:
+    env:
+      JOB_DATA_API_URL: https://pgsql.jdb.l.cd
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      JOB_STORAGE_BACKEND: supabase
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -33,6 +37,9 @@ jobs:
           else
             echo "requirements.txt not found. If your script has dependencies, please create this file."
           fi
+
+      - name: Configure private data API
+        uses: ./.github/actions/configure-data-api
 
       - name: Run resume customization script
         env:

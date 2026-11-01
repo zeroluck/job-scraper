@@ -1,0 +1,32 @@
+name: Private Data API SDK Qualification
+
+# Deliberately isolated: no schedules, workflow_run, production workers,
+# storage credentials, claims, publication, scoring, or mutation RPCs.
+on:
+  workflow_dispatch:
+  push:
+    branches: [cutover/jobs-native337]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify_sdk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      JOB_DATA_API_URL: https://pgsql.jdb.l.cd
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      JOB_STORAGE_BACKEND: supabase
+      PYTHON_DOTENV_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install focused SDK dependencies
+        run: python -m pip install supabase certifi
+      - name: Configure private data API
+        uses: ./.github/actions/configure-data-api
+      - name: Qualify signed SDK GET and read-only configuration RPC
+        run: python -m scripts.qualify_data_api

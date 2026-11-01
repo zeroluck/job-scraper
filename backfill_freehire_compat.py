@@ -28,11 +28,9 @@ SELECT_FIELDS = (
 
 
 def _get_db():
-    from supabase import create_client
+    from data_client import create_data_client
 
-    if not config.SUPABASE_URL or not config.SUPABASE_SERVICE_ROLE_KEY:
-        raise ValueError("Supabase URL and Key must be set in environment variables or config.")
-    return create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY)
+    return create_data_client(config)
 
 
 def get_upper_bound(db) -> str | None:

@@ -1,4 +1,6 @@
 requests
+certifi
+boto3>=1.35,<2
 beautifulsoup4
 python-dotenv
 supabase

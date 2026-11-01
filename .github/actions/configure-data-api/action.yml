@@ -1,0 +1,19 @@
+name: Configure private data API trust
+description: Fail closed on missing target credentials and preserve public HTTPS trust
+runs:
+  using: composite
+  steps:
+    - name: Require target data API configuration
+      shell: bash
+      run: |
+        if [[ -z "${JOB_DATA_API_URL//[[:space:]]/}" || -z "${JOB_DATA_API_TOKEN//[[:space:]]/}" ]]; then
+          echo 'JOB_DATA_API_URL and JOB_DATA_API_TOKEN must both be set.' >&2
+          exit 1
+        fi
+        if [[ "$JOB_STORAGE_BACKEND" != supabase ]]; then
+          echo 'Production object storage must remain on Supabase.' >&2
+          exit 1
+        fi
+    - name: Combine public and private CA roots for HTTPX and Requests
+      shell: bash
+      run: python scripts/configure_data_api.py

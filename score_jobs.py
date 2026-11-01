@@ -630,12 +630,8 @@ def run_manual_scoring_ignoring_score_jobs_setting(archetype: str):
 
 
 if __name__ == "__main__":
-    if not config.SUPABASE_URL or not config.SUPABASE_SERVICE_ROLE_KEY:
-        logging.error("Supabase URL or Key environment variable not set.")
-        raise SystemExit(1)
-    else:
-        result = run_scheduled_scoring(
-            db=supabase_utils.supabase,
-            archetype_override=os.getenv("JOB_SCORE_ARCHETYPE"),
-        )
-        raise SystemExit(scoring_result_exit_code(result))
+    result = run_scheduled_scoring(
+        db=supabase_utils.supabase,
+        archetype_override=os.getenv("JOB_SCORE_ARCHETYPE"),
+    )
+    raise SystemExit(scoring_result_exit_code(result))

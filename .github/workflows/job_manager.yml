@@ -13,6 +13,10 @@ concurrency:
 
 jobs:
   manage:
+    env:
+      JOB_DATA_API_URL: https://pgsql.jdb.l.cd
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      JOB_STORAGE_BACKEND: supabase
     runs-on: ubuntu-latest # Use a standard Linux runner
 
     steps:
@@ -29,6 +33,9 @@ jobs:
           python -m pip install --upgrade pip
           # Ensure requirements.txt includes httpx if not already added
           pip install -r requirements.txt
+
+      - name: Configure private data API
+        uses: ./.github/actions/configure-data-api
 
       - name: Run job manager script
         env:

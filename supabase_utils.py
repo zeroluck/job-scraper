@@ -1,4 +1,6 @@
-from supabase import create_client, Client
+from supabase import Client
+from data_client import create_data_client
+import storage_adapter
 from postgrest.types import ReturnMethod
 import httpx
 import config # Import configuration
@@ -116,12 +118,8 @@ def _canonical_job_write_payload(job: Mapping[str, Any]) -> dict:
         if key not in TRANSIENT_JOB_FIELDS and key not in GENERATED_JOB_FIELDS
     }
 
-# --- Initialize Supabase Client ---
-# Ensure URL and Key are provided
-if not config.SUPABASE_URL or not config.SUPABASE_SERVICE_ROLE_KEY:
-    raise ValueError("Supabase URL and Key must be set in environment variables or config.")
-
-supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY)
+# Preserve the public client name and all table/RPC contracts.
+supabase: Client = create_data_client(config)
 
 
 def _collect_job_identifiers(value: Any, seen: set[int] | None = None) -> list[str]:
@@ -3028,7 +3026,7 @@ def get_job_by_id(job_id: str) -> dict | None:
 
 def upload_customized_resume_to_storage(file_content: bytes, destination_path: str) -> Optional[str]:
     """
-    Uploads the generated resume PDF (as bytes) to Supabase Storage.
+    Uploads the generated resume PDF (as bytes) to the selected object storage.
 
     Args:
         file_content: The resume content in bytes.
@@ -3047,29 +3045,17 @@ def upload_customized_resume_to_storage(file_content: bytes, destination_path: s
         return None
 
     try:
-        logging.info(f"Uploading resume to Supabase Storage at path: {destination_path}")
+        logging.info(f"Uploading resume to object storage at path: {destination_path}")
 
-        # Use upsert=True if you want to overwrite if a file with the same name exists,
-        # otherwise False (or omit) to potentially get an error if it exists.
-        # Ensure your destination_path includes job_id or similar for uniqueness.
-        upload_response = supabase.storage.from_(config.SUPABASE_STORAGE_BUCKET)\
-            .upload(
-                path=destination_path,
-                file=file_content,
-                file_options={"content-type": "application/pdf", "upsert": "true"} # Set upsert based on desired behavior
-            )
+        storage_adapter.get_storage_adapter(supabase_client=supabase).upload_pdf(
+            config.SUPABASE_STORAGE_BUCKET, destination_path, file_content,
+        )
 
         logging.info(f"Successfully uploaded resume to path: {destination_path}")
         return destination_path
 
     except Exception as e:
-        # Supabase client might raise specific exceptions, catch broadly for now
-        logging.error(f"Error uploading file to Supabase Storage: {e}")
-        # Attempt to remove partially uploaded file if possible/needed (more complex error handling)
-        # try:
-        #     supabase.storage.from_(config.SUPABASE_STORAGE_BUCKET).remove([destination_path])
-        # except:
-        #     logging.warning(f"Could not clean up potentially failed upload at {destination_path}")
+        logging.error("Error uploading resume to object storage (%s).", type(e).__name__)
         return None
 
 def update_job_with_resume_link(job_id: str, customized_resume_id: str, new_status: Optional[str] = "resume_generated", archetype: str | None = None) -> bool:
@@ -3283,7 +3269,7 @@ def get_customized_resume(resume_id: str) -> Optional[Dict[str, Any]]:
 
 def download_resume_from_storage(file_name: str = "resume.pdf") -> Optional[bytes]:
     """
-    Downloads the user's resume PDF from the 'resumes' Supabase Storage bucket.
+    Downloads the user's resume PDF from the selected storage's 'resumes' bucket.
 
     Args:
         file_name: The name of the resume file in the storage bucket.
@@ -3297,8 +3283,8 @@ def download_resume_from_storage(file_name: str = "resume.pdf") -> Optional[byte
         return None
 
     try:
-        logging.info(f"Downloading '{file_name}' from Supabase Storage bucket '{bucket_name}'...")
-        file_bytes = supabase.storage.from_(bucket_name).download(file_name)
+        logging.info(f"Downloading '{file_name}' from object storage bucket '{bucket_name}'...")
+        file_bytes = storage_adapter.get_storage_adapter(supabase_client=supabase).download(bucket_name, file_name)
 
         if file_bytes:
             logging.info(f"Successfully downloaded '{file_name}' ({len(file_bytes)} bytes).")
@@ -3308,7 +3294,7 @@ def download_resume_from_storage(file_name: str = "resume.pdf") -> Optional[byte
             return None
 
     except Exception as e:
-        logging.error(f"Error downloading '{file_name}' from Supabase Storage: {e}")
+        logging.error("Error downloading resume from object storage (%s).", type(e).__name__)
         return None
 
 
