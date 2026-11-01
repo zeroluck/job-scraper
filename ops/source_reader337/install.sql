@@ -43,7 +43,18 @@ BEGIN
   CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
   WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND a.grantee=0)
  OR EXISTS (SELECT FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a WHERE a.grantee=0)
- OR NOT EXISTS (SELECT FROM pg_default_acl WHERE defaclrole='postgres'::regrole AND defaclnamespace=0 AND defaclobjtype='f') THEN
+ -- An absent global entry means PostgreSQL's implicit PUBLIC EXECUTE, not
+ -- an empty ACL. Check each possible creator's own defaults: inherited role
+ -- defaults do not apply to objects it creates. Include database CREATE, which
+ -- permits creating new schemas. pg_database_owner cannot be an actual creator
+ -- (SET ROLE is prohibited); its implicit member, the database owner, is checked.
+ OR EXISTS (SELECT FROM pg_roles r
+  CROSS JOIN LATERAL aclexplode(coalesce((SELECT d.defaclacl FROM pg_default_acl d
+   WHERE d.defaclrole=r.oid AND d.defaclnamespace=0 AND d.defaclobjtype='f'),acldefault('f',r.oid))) a
+  WHERE r.rolname <> 'pg_database_owner' AND a.grantee=0 AND a.privilege_type='EXECUTE'
+   AND (has_database_privilege(r.oid,current_database(),'CREATE')
+    OR EXISTS (SELECT FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+     AND has_schema_privilege(r.oid,n.oid,'CREATE')))) THEN
   RAISE EXCEPTION 'PUBLIC/default ACL drift'; END IF;
 END $guard$;
 LOCK TABLE public.jobs IN ACCESS SHARE MODE;

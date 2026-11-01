@@ -32,7 +32,12 @@ and administrator `postgres`. It rejects connected/enabled original OID `16388`,
 existing reader/policy, shared-gateway flag/settings/membership drift, missing
 RLS/wrong owner/PUBLIC jobs policies, exact JWT hook definition drift, PUBLIC
 custom-object capabilities, PUBLIC CREATE and unsafe explicit default ACLs.
-The global postgres function default ACL must already be hardened. The installer
+Every actual role with effective CREATE on a persistent application schema or
+the database (including owners, superusers and inherited CREATE) must already
+have its own safe global function defaults. Missing defaults mean implicit
+PUBLIC EXECUTE and are rejected, even for NOLOGIN roles; schema-local revokes
+and another role's hardened defaults do not suffice. The non-assumable
+`pg_database_owner` pseudo-role is excluded; its actual database owner is checked. The installer
 never repairs shared objects/defaults. Second execution rejects rather than
 silently reconciling state. Run with `psql -X -v ON_ERROR_STOP=1`, in a coordinated
 maintenance window without concurrent authorization/schema changes.
@@ -92,15 +97,23 @@ plus a three-row final batch, terminal empty pages, sorted/missing IDs, rejected
 invalid cursors and the server's 500-row cap. It checks HTTP and SQL denials for
 other rows, every ungranted jobs column, other tables, RPCs, INSERT/UPDATE/DELETE,
 TRUNCATE, schema CREATE and privilege escalation. It tests future table/sequence/
-function denial, including CREATE followed by ALTER OWNER; valid JWTs and missing,
+function denial, including CREATE followed by ALTER OWNER and actual non-superuser
+creator-role CREATE of a SECURITY DEFINER that can read private data as its owner
+but cannot execute as the reader; valid JWTs and missing,
 malformed, expired, wrong-audience/issuer and invalid-signature controls.
+
+All qualification safety checks raise explicitly and remain active under
+`python3 -O`; `python3 -m unittest discover -s ops/source_reader337 -p 'test_*.py'`
+checks optimized false-check and importer-hash rejection. The full gate also runs
+under `python3 -O` without skipping authorization or snapshot checks.
 
 The literal production identity guard must reject the disposable cluster.
 For positive qualification only that exact identity expression is replaced with
 an isolated jobs/PG17 guard; no ACL/RLS/JWT guard is disabled. Guard-drift tests
 strip BOTH installer transaction delimiters, run injected drift plus candidate
 inside one rollback transaction and compare catalog/data state. Rollback is
-exercised including unexpected-dependency failure and membership preservation.
+exercised including unexpected-dependency failure and comparison of the entire
+installed snapshot captured after the injected grant, not just membership.
 Final catalog, role, membership, policy, default ACL and full-row hashes must
 match baseline. Relation NULL ACLs are expanded to their PostgreSQL default
 owner ACL solely to compare logically identical ACL representations after the

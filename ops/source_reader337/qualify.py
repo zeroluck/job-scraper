@@ -11,6 +11,10 @@ HERE = pathlib.Path(__file__).resolve().parent
 IMPORTER_SHA = '51b7dc71421d088e70cb7742376aa614ceb9189ecc377e2489b609440195b000'
 ROLE = 'freehire_source_reader'
 
+def require(value, message):
+    if not value:
+        raise AssertionError(message)
+
 def run(*args, data=None, ok=True):
     p = subprocess.run(args, input=data, text=True, capture_output=True)
     if ok and p.returncode:
@@ -24,7 +28,7 @@ def main():
     ap.add_argument('--receipt', type=pathlib.Path, required=True)
     a = ap.parse_args()
     raw = a.importer.read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == IMPORTER_SHA, 'deployed importer hash mismatch'
+    require(hashlib.sha256(raw).hexdigest() == IMPORTER_SHA, 'deployed importer hash mismatch')
     # Compile only the unchanged read class/constants/signature. No worker imports,
     # pull orchestration, upsert, destination connection or delete code can execute.
     tree = ast.parse(raw)
@@ -43,14 +47,14 @@ def main():
     def sql(text, ok=True):
         return run('docker','exec','-i',pg,'psql','-XAtq','-v','ON_ERROR_STOP=1','-U','postgres','-d','jobs', data=text,ok=ok)
     def check(name, value):
-        assert value, name
+        require(value, name)
         checks.append(name)
     def install_text():
         text = (HERE/'install.sql').read_text()
         # The ONLY transformed clause is the exact production identity expression.
         # All ACL, shared-role, hook, default and RLS guards execute unchanged.
         identity = "current_database() <> 'jobs' OR (SELECT oid FROM pg_database WHERE datname=current_database()) <> 299919 OR (SELECT system_identifier::text FROM pg_control_system()) <> '7701229561420400865'"
-        assert text.count(identity) == 1
+        require(text.count(identity) == 1, 'production identity expression mismatch')
         return text.replace(identity, "current_database() <> 'jobs' OR current_setting('server_version_num')::int / 10000 <> 17")
     try:
         run('docker','network','create',net); made.append(('network',net))
@@ -62,12 +66,18 @@ def main():
         mounts=instance['Mounts']
         check('fixture database is tmpfs without persistent volume','/var/lib/postgresql/data' in instance['HostConfig'].get('Tmpfs',{}) and not any(m['Type']=='volume' for m in mounts))
         sql((HERE/'fixture.sql').read_text())
+        # Disposable accepted non-superuser creator: its OWN global defaults
+        # must be hardened, even when privilege/defaults are inherited elsewhere.
+        sql('ALTER DEFAULT PRIVILEGES FOR ROLE job_runner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC; GRANT USAGE,CREATE ON SCHEMA public TO job_runner; GRANT SELECT ON public.other_data TO job_runner;')
         snapshot_query = """SELECT json_build_object(
           'relations',(SELECT json_agg(x ORDER BY oid) FROM (SELECT c.oid,relname,relowner,coalesce(relacl,acldefault(CASE WHEN relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,relowner)) AS relacl,relrowsecurity,relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth'))x),
           'columns',(SELECT json_agg(x ORDER BY attrelid,attnum) FROM (SELECT attrelid,attnum,attname,attacl FROM pg_attribute WHERE attrelid IN (SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace))x),
           'policies',(SELECT json_agg(x ORDER BY oid) FROM pg_policy x),
-          'functions',(SELECT json_agg(x ORDER BY oid) FROM (SELECT oid,proname,proowner,proacl,prosrc FROM pg_proc WHERE pronamespace IN ('public'::regnamespace,'auth'::regnamespace))x),
-          'schemas',(SELECT json_agg(x ORDER BY oid) FROM (SELECT oid,nspname,nspowner,nspacl FROM pg_namespace WHERE nspname IN ('public','auth'))x),
+          'functions',(SELECT json_agg(x ORDER BY oid) FROM pg_proc x WHERE pronamespace IN (SELECT oid FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema')),
+          'schemas',(SELECT json_agg(x ORDER BY oid) FROM pg_namespace x WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
+          'database',(SELECT row_to_json(x) FROM pg_database x WHERE datname=current_database()),
+          'settings',(SELECT json_agg(x ORDER BY setdatabase,setrole) FROM pg_db_role_setting x),
+          'role_comments',(SELECT json_agg(x ORDER BY objoid,classoid) FROM pg_shdescription x WHERE classoid='pg_authid'::regclass),
           'defaults',(SELECT json_agg(x ORDER BY oid) FROM pg_default_acl x),
           'roles',(SELECT json_agg(x ORDER BY oid) FROM pg_roles x),
           'memberships',(SELECT json_agg(x ORDER BY oid) FROM pg_auth_members x),
@@ -91,6 +101,12 @@ def main():
                 ('PUBLIC function', 'GRANT EXECUTE ON FUNCTION public.forbidden_rpc() TO PUBLIC;', 'PUBLIC/default ACL drift'),
                 ('PUBLIC schema CREATE', 'GRANT CREATE ON SCHEMA public TO PUBLIC;', 'PUBLIC/default ACL drift'),
                 ('future PUBLIC function', 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres GRANT EXECUTE ON FUNCTIONS TO PUBLIC; CREATE FUNCTION public.future() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;', 'PUBLIC/default ACL drift'),
+                ('implicit creator function default', 'CREATE ROLE existing_creator NOLOGIN; GRANT USAGE,CREATE ON SCHEMA public TO existing_creator; GRANT SELECT ON public.other_data TO existing_creator;', 'PUBLIC/default ACL drift'),
+                ('schema-only creator revoke', 'CREATE ROLE schema_creator NOLOGIN; GRANT CREATE ON SCHEMA public TO schema_creator; ALTER DEFAULT PRIVILEGES FOR ROLE schema_creator IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;', 'PUBLIC/default ACL drift'),
+                ('inherited creator default', 'CREATE ROLE inherited_creator NOLOGIN INHERIT; GRANT job_runner TO inherited_creator;', 'PUBLIC/default ACL drift'),
+                ('schema owner creator default', 'CREATE ROLE schema_owner NOLOGIN; CREATE SCHEMA owned AUTHORIZATION schema_owner;', 'PUBLIC/default ACL drift'),
+                ('database creator default', 'CREATE ROLE database_creator NOLOGIN; GRANT CREATE ON DATABASE jobs TO database_creator;', 'PUBLIC/default ACL drift'),
+                ('superuser creator default', 'CREATE ROLE elevated_creator NOLOGIN SUPERUSER;', 'PUBLIC/default ACL drift'),
                 ('gateway inherit', 'ALTER ROLE jobs_gateway INHERIT;', 'gateway authority drift'),
                 ('gateway elevated', 'ALTER ROLE jobs_gateway CREATEROLE;', 'gateway authority drift'),
                 ('gateway setting', "ALTER ROLE jobs_gateway SET work_mem='8MB';", 'gateway authority drift'),
@@ -192,6 +208,14 @@ def main():
                 check('denied column '+col['attname'],result.returncode!=0 and 'permission denied' in result.stderr)
         check('only hook custom function executable',sql("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','auth') AND has_function_privilege('freehire_source_reader',p.oid,'EXECUTE') AND p.oid <> 'auth.require_jwt_claims()'::regprocedure").stdout.strip()=='0')
         sql("CREATE TABLE public.future_data(x int); CREATE SEQUENCE public.future_seq; CREATE FUNCTION public.future_rpc() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$; ALTER FUNCTION public.future_rpc() OWNER TO job_runner;")
+        # CREATE under the actual role, NOT postgres CREATE then ALTER OWNER:
+        # default ACL selection happens at CREATE, never at ownership transfer.
+        sql("SET ROLE job_runner; CREATE FUNCTION public.creator_leak() RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$ SELECT secret FROM public.other_data LIMIT 1 $$;")
+        check('actual creator owns future definer',sql("SELECT proowner='job_runner'::regrole AND prosecdef FROM pg_proc WHERE oid='public.creator_leak()'::regprocedure").stdout.strip()=='t')
+        check('actual creator definer can read private data',sql("SET ROLE job_runner; SELECT public.creator_leak()").stdout.strip()=='private')
+        result=sql('SET SESSION AUTHORIZATION jobs_gateway; SET ROLE '+ROLE+'; SELECT public.creator_leak()',ok=False)
+        check('actual creator future definer denied',result.returncode!=0 and 'permission denied' in result.stderr)
+        sql('DROP FUNCTION public.creator_leak()')
         for statement in ['SELECT * FROM public.future_data',"SELECT nextval('public.future_seq')",'SELECT public.future_rpc()']:
             result=sql('SET SESSION AUTHORIZATION jobs_gateway; SET ROLE '+ROLE+'; '+statement,ok=False)
             check('future object denied '+statement,result.returncode!=0 and 'permission denied' in result.stderr)
@@ -201,11 +225,12 @@ def main():
         check('second install rejected',sql(install_text(),ok=False).returncode!=0)
         rollback = (HERE/'rollback.sql').read_text()
         identity = "current_database() <> 'jobs' OR (SELECT oid FROM pg_database WHERE datname=current_database()) <> 299919 OR (SELECT system_identifier::text FROM pg_control_system()) <> '7701229561420400865'"
+        require(rollback.count(identity) == 1, 'rollback identity expression mismatch')
         rollback = rollback.replace(identity,"current_database() <> 'jobs' OR current_setting('server_version_num')::int / 10000 <> 17")
-        rollback_before = json.loads(sql(snapshot_query).stdout)
         sql('GRANT SELECT ON public.other_data TO freehire_source_reader')
+        rollback_before = json.loads(sql(snapshot_query).stdout)
         check('rollback refuses unexpected dependency',sql(rollback,ok=False).returncode!=0)
-        check('failed rollback preserves membership',sql("SELECT count(*) FROM pg_auth_members WHERE roleid='freehire_source_reader'::regrole AND member='jobs_gateway'::regrole").stdout.strip()=='1')
+        check('failed rollback preserves full installed snapshot',json.loads(sql(snapshot_query).stdout)==rollback_before)
         sql('REVOKE SELECT ON public.other_data FROM freehire_source_reader')
         sql(rollback)
         check('rollback role absent',sql("SELECT count(*) FROM pg_roles WHERE rolname='freehire_source_reader'").stdout.strip()=='0')
