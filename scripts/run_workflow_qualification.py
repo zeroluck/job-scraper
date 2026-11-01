@@ -1,18 +1,19 @@
 """Opt-in bounded REAL worker execution, not a dry run or an SDK health check.
 
 The caller must independently verify persistent outcomes. Never use this module
-as authority to enable a disabled workflow. Scraping and job-manager bulk expiry
-are deliberately unsupported until their write envelopes can be bounded.
+as authority to enable a disabled workflow. Full scraping/publication remains
+unsupported until its write envelope can be safely bounded.
 """
 import argparse
 import asyncio
 import importlib
 import json
 import os
+import sys
 
 WORKERS = (
     'analyze_jobs', 'score_jobs', 'parse_resume', 'hourly_resume_customization',
-    'freehire_compat', 'backfill_linkedin_metadata', 'backfill_same_id_relists',
+    'freehire_compat', 'backfill_linkedin_metadata', 'backfill_same_id_relists', 'job_manager',
 )
 
 
@@ -26,9 +27,11 @@ def validate(workflow, archetype, env):
         raise ValueError('One explicit canonical lane is required')
 
 
-def bounded_completion(provider, requests=2):
+def bounded_completion(provider, requests=2, *, usage=None):
     """Count provider invocations INCLUDING errors, across every LLM client."""
     count = 0
+    if usage is not None:
+        usage['attempts'] = 0
 
     def call(**kwargs):
         nonlocal count
@@ -37,6 +40,8 @@ def bounded_completion(provider, requests=2):
         if count >= requests:
             raise RuntimeError('qualification request budget exhausted')
         count += 1
+        if usage is not None:
+            usage['attempts'] = count
         kwargs['max_tokens'] = min(kwargs.get('max_tokens') or 4096, 4096)
         kwargs['num_retries'] = 0
         kwargs['timeout'] = min(kwargs.get('timeout') or 30, 30)
@@ -59,6 +64,17 @@ def execute(workflow, archetype, importer=importlib.import_module):
     try:
         for name, value in overrides.items():
             setattr(config, name, value)
+        if workflow == 'job_manager':
+            expiry_id = os.getenv('QUALIFICATION_EXPIRY_JOB_ID', '').strip()
+            activity_id = os.getenv('QUALIFICATION_ACTIVITY_JOB_ID', '').strip()
+            if not expiry_id or not activity_id or expiry_id == activity_id:
+                raise ValueError('Two distinct explicit job-manager row identities are required')
+            worker = importer('job_manager')
+            async def manage():
+                await worker.mark_expired_jobs(job_id=expiry_id, limit=1)
+                await worker.check_linkedin_job_activity(job_id=activity_id, limit=1)
+            asyncio.run(manage())
+            return {'invoked': True, 'readback_required': True}
         if workflow == 'score_jobs':
             worker = importer('score_jobs')
             result = worker.main(archetype, run_filter_prepass=False)
@@ -102,9 +118,23 @@ def main(argv=None):
     # Only this fresh qualification process is affected. The actual provider
     # remains real; retries and model fallbacks share a single hard call budget.
     import litellm
-    litellm.completion = bounded_completion(litellm.completion)
-    result = execute(args.workflow, args.archetype)
+    provider = litellm.completion
+    usage = {}
+    completion = bounded_completion(provider, usage=usage)
+    litellm.completion = completion
+    try:
+        result = execute(args.workflow, args.archetype)
+    except (Exception, SystemExit) as exc:
+        # Never echo transport/DB exception messages: they may contain credentials.
+        # A failed/interrupted worker may already have persisted claims or grants.
+        print(json.dumps({'workflow': args.workflow, 'execution_returned': False,
+                          'readback_required': True, 'error_type': type(exc).__name__,
+                          'llm_attempts': usage['attempts']}), file=sys.stderr)
+        return 1
+    finally:
+        litellm.completion = provider
     print(json.dumps({'workflow': args.workflow, 'execution_returned': True,
+                      'llm_attempts': usage['attempts'],
                       'readback_required': True, 'result': result}, default=str))
     return 0
 

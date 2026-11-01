@@ -38,7 +38,11 @@
       "expected_persistent_outcomes": [
         "No database mutation; migration drift command and SQL setup tests pass against checked-out web master."
       ],
-      "blockers": []
+      "blockers": [],
+      "readback": {
+        "tables": [],
+        "acceptance": "Read-only: verify no persistent target or Storage mutations; retain authenticated and negative-check receipts."
+      }
     },
     {
       "id": 403167574,
@@ -58,7 +62,7 @@
       ],
       "executed_by_this_task": false,
       "can_dispatch_now": false,
-      "qualification_support": "historical_branch_push_only",
+      "qualification_support": "manual_only_source_restored_locally_not_published",
       "qualification_inputs": null,
       "command_after_release_and_parent_authorization": null,
       "source_ref": "9e8e24e36ddb88ef9d0ec6f05ef2f8cb08b23bc5",
@@ -72,9 +76,13 @@
         "No database/storage changes. Trusted curl/Python/Node reads succeed; missing/invalid token rejected; untrusted CA and hostname mismatch rejected."
       ],
       "blockers": [
-        "Workflow registration is active but file does not exist on main and historical source has no workflow_dispatch.",
-        "Do not claim gh workflow run works for this workflow. Restore a reviewed manual-only definition before a new qualification; do not push merely to retrigger."
-      ]
+        "Independent review and publication pending; source_on_main remains false until verified remotely.",
+        "Set reviewed repository JOB_DATA_API_URL variable and retain JOBS_TLS_QUALIFICATION_JWT secret; no live execution performed."
+      ],
+      "readback": {
+        "tables": [],
+        "acceptance": "Read-only: verify no persistent target or Storage mutations; retain authenticated and negative-check receipts."
+      }
     },
     {
       "id": 403179052,
@@ -104,7 +112,11 @@
       "expected_persistent_outcomes": [
         "No target mutation; signed SDK table GET plus read-only configuration RPC pass."
       ],
-      "blockers": []
+      "blockers": [],
+      "readback": {
+        "tables": [],
+        "acceptance": "Read-only: verify no persistent target or Storage mutations; retain authenticated and negative-check receipts."
+      }
     },
     {
       "id": 236353264,
@@ -157,7 +169,8 @@
         ],
         "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'customized_resumes' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.customized_resumes t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
@@ -183,22 +196,53 @@
       ],
       "executed_by_this_task": false,
       "can_dispatch_now": false,
-      "qualification_support": "missing",
-      "qualification_inputs": null,
+      "qualification_support": "prepared_locally_not_published",
+      "qualification_inputs": {
+        "qualification": "true",
+        "qualification_archetype": "technology_delivery",
+        "qualification_expiry_job_id": "<reviewed-expiry-id>",
+        "qualification_activity_job_id": "<distinct-reviewed-activity-id>"
+      },
       "command_after_release_and_parent_authorization": null,
       "limits": {
-        "bulk_expiry_bounded": false,
+        "expiry_rows": 1,
+        "activity_rows": 1,
+        "deletion_rows": 0,
+        "deadline_seconds": 300,
         "llm_attempts": 0
       },
       "expected_persistent_outcomes": [
         "Expiry updates job_state/is_active for old eligible rows; activity check updates last_checked or marks removed; request grants finish.",
-        "Protected applied/offer/interviewing rows and deletion remain unchanged."
+        "Protected applied/offer/interviewing rows and deletion remain unchanged.",
+        "Shared request policy/grants and cross-producer discovery task-attempt invalidations require full before/after readback; one selected job does not imply one affected row."
       ],
       "blockers": [
-        "No workflow dispatch inputs; main invokes unbounded mark_expired_jobs before bounded activity checking.",
-        "Confirmed baseline failure: response_text_lower is undefined in activity content handling.",
-        "Needs scoped expiry/activity selection plus explicit cap and failure propagation before real qualification."
-      ]
+        "Independent review and publication pending; all writers remain disabled.",
+        "Promoted target acceptance and writer authorization pending.",
+        "Select two distinct eligible canonical rows; verify lane membership independently and read back exact persistent outcomes. No candidates is not acceptance."
+      ],
+      "readback": {
+        "tables": [
+          "jobs",
+          "linkedin_source_request_policy",
+          "linkedin_source_request_grants",
+          "linkedin_discovery_task_attempts",
+          "canonical_provider_revisions"
+        ],
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t;\nSELECT 'linkedin_source_request_policy' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_source_request_policy t;\nSELECT 'linkedin_source_request_grants' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_source_request_grants t;\nSELECT 'linkedin_discovery_task_attempts' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_task_attempts t;\nSELECT 'canonical_provider_revisions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.canonical_provider_revisions t;",
+        "acceptance": "Independent before/after exact authority snapshots and semantic row/claim checks are mandatory; no candidates or execution_returned is not a pass.",
+        "fingerprint_caveat": "Full-table before/after fingerprints are required for shared effects and unchanged outside-scope proof. Independently save exact rows, compare grant IDs/status/producer/key/response_class/http_status/start/finish and policy generation/timing; hashes alone are not semantic acceptance. Fence other writers for attribution; do not job/lane-filter shared gate evidence. Never retry or reset the circuit automatically after interruption/challenge.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume.",
+        "trigger_effects": "jobs maintain_canonical_provider_revision trigger advances shared provider revision on job mutations; jobs canonical_revision and compatibility invalidation fields also require semantic readback."
+      },
+      "request_gate_envelope": {
+        "scope": "shared_linkedin_source",
+        "automatic_circuit_reset": false,
+        "challenge_invalidates_other_producers": true,
+        "physical_http_attempts_max": 3,
+        "acceptance": "Acquisition marks expired pending grants even on wait/circuit-open; grant creation/consumption advances shared next_allowed_at/updated_at. Every issued request must have a finished response_class/http_status or documented challenge invalidation. Challenge increments circuit_generation and opens policy; invalidates other producers pending/consumed grants and unfinished linkedin_discovery_task_attempts. Compare all preexisting grants and task attempts, not just this job/producer. Circuit-open/unavailable/transport/parser failure is not successful metadata qualification.",
+        "retry_amplification": "Metadata uses MAX_RETRIES=3: one canonical candidate can issue four HTTP requests/grants; first 404 is retried once and each retry acquires a new grant. Job-manager activity has ACTIVE_CHECK_MAX_RETRIES=2. Gate wait calls can expire unrelated pending grants without issuing HTTP; 300-second process deadline is not a database-row write cap."
+      }
     },
     {
       "id": 236353266,
@@ -262,7 +306,8 @@
         ],
         "fingerprint_sql": "SELECT 'archetype_resume_profiles' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.archetype_resume_profiles t WHERE coalesce(to_jsonb(t)->>'archetype','') in (:'lane','');\nSELECT 'base_resume' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.base_resume t WHERE coalesce(to_jsonb(t)->>'archetype','') in (:'lane','');",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
@@ -332,7 +377,8 @@
         ],
         "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
@@ -384,7 +430,7 @@
       ],
       "executed_by_this_task": false,
       "can_dispatch_now": false,
-      "qualification_support": "missing",
+      "qualification_support": "partial_primitives_only_not_dispatchable",
       "qualification_inputs": null,
       "command_after_release_and_parent_authorization": null,
       "least_scope_existing_inputs": {
@@ -400,14 +446,63 @@
       },
       "expected_persistent_outcomes": [
         "Real adaptive discovery cycle/tasks, request grants, listing observations/content/relist states, canonical jobs and lane memberships persist.",
-        "Full pipeline additionally performs compatibility, publication generation/watermark finalization and gate watchdog issue writes."
+        "Full pipeline additionally performs compatibility, publication generation/watermark finalization and gate watchdog issue writes.",
+        "Shared request policy/grants and cross-producer discovery task-attempt invalidations require full before/after readback; one selected job does not imply one affected row."
       ],
       "blockers": [
-        "No hard one-task/one-result qualification dispatch mode. A lane limits lanes, not rows/tasks.",
-        "Single-lane dispatch SKIPS compatibility, publication_gate and watchdog: it cannot qualify the entire workflow.",
-        "Full pipeline currently allows GitHub issue notifications; qualification must suppress watchdog while preserving publication acceptance.",
-        "Source publication must not change until initial native FreeHire pull acceptance."
-      ]
+        "Full pipeline qualification remains unsupported: do not dispatch or treat bounded discovery primitives as end-to-end acceptance.",
+        "New run_discovery(qualification=True) caps one execution/manifest/search attempt/card/detail task/detail attempt and rejects shared resume; no scraper entrypoint wiring yet.",
+        "Detail task RPC claims globally, not by cycle_id; isolation/scoped claim support must be qualified before real execution.",
+        "A nonempty first page does not prove exhaustion: do not truncate cards, seal incomplete coverage or bypass real publication requirements.",
+        "Compatibility/publication finalizer can affect global pending work/generations; a safe intended full-publication envelope remains unresolved.",
+        "suppress_notifications=true skips only GitHub issue watchdog writes and is NOT a qualification mode.",
+        "Initial native FreeHire pull and promoted target acceptance still pending."
+      ],
+      "readback": {
+        "tables": [
+          "ingestion_runs",
+          "scrape_run_state",
+          "linkedin_scope_coverage_state",
+          "linkedin_discovery_cycles",
+          "linkedin_discovery_cycle_scopes",
+          "linkedin_ingestion_pages",
+          "linkedin_ingestion_page_sources",
+          "linkedin_discovery_cycle_sources",
+          "linkedin_discovery_tasks",
+          "linkedin_discovery_requirements",
+          "linkedin_coverage_debt",
+          "linkedin_discovery_cycle_resolutions",
+          "linkedin_coverage_debt_attempts",
+          "linkedin_discovery_requirement_acceptances",
+          "jobs",
+          "canonical_provider_revisions",
+          "job_archetype_memberships",
+          "listing_observations",
+          "listing_content_versions",
+          "listing_relist_events",
+          "listing_states",
+          "freehire_publication_state",
+          "freehire_publication_generations",
+          "freehire_publication_snapshots",
+          "linkedin_source_request_policy",
+          "linkedin_source_request_grants",
+          "linkedin_discovery_task_attempts"
+        ],
+        "fingerprint_sql": "SELECT 'ingestion_runs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.ingestion_runs t;\nSELECT 'scrape_run_state' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.scrape_run_state t;\nSELECT 'linkedin_scope_coverage_state' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_scope_coverage_state t;\nSELECT 'linkedin_discovery_cycles' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_cycles t;\nSELECT 'linkedin_discovery_cycle_scopes' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_cycle_scopes t;\nSELECT 'linkedin_ingestion_pages' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_ingestion_pages t;\nSELECT 'linkedin_ingestion_page_sources' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_ingestion_page_sources t;\nSELECT 'linkedin_discovery_cycle_sources' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_cycle_sources t;\nSELECT 'linkedin_discovery_tasks' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_tasks t;\nSELECT 'linkedin_discovery_requirements' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_requirements t;\nSELECT 'linkedin_coverage_debt' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_coverage_debt t;\nSELECT 'linkedin_discovery_cycle_resolutions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_cycle_resolutions t;\nSELECT 'linkedin_coverage_debt_attempts' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_coverage_debt_attempts t;\nSELECT 'linkedin_discovery_requirement_acceptances' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_requirement_acceptances t;\nSELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t;\nSELECT 'canonical_provider_revisions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.canonical_provider_revisions t;\nSELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t;\nSELECT 'listing_observations' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_observations t;\nSELECT 'listing_content_versions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_content_versions t;\nSELECT 'listing_relist_events' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_relist_events t;\nSELECT 'listing_states' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_states t;\nSELECT 'freehire_publication_state' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.freehire_publication_state t;\nSELECT 'freehire_publication_generations' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.freehire_publication_generations t;\nSELECT 'freehire_publication_snapshots' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.freehire_publication_snapshots t;\nSELECT 'linkedin_source_request_policy' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_source_request_policy t;\nSELECT 'linkedin_source_request_grants' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_source_request_grants t;\nSELECT 'linkedin_discovery_task_attempts' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_task_attempts t;",
+        "acceptance": "Independent before/after exact authority snapshots and semantic row/claim checks are mandatory; no candidates or execution_returned is not a pass.",
+        "fingerprint_caveat": "Full-table before/after fingerprints are required for shared effects and unchanged outside-scope proof. Independently save exact rows, compare grant IDs/status/producer/key/response_class/http_status/start/finish and policy generation/timing; hashes alone are not semantic acceptance. Fence other writers for attribution; do not job/lane-filter shared gate evidence. Never retry or reset the circuit automatically after interruption/challenge.",
+        "external_effects": "GitHub gate_watchdog issue creation/update suppressed; no FreeHire pull/notification dispatch. Read all publication rows/generations, not only requested lane/cycle.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume."
+      },
+      "request_gate_envelope": {
+        "scope": "shared_linkedin_source",
+        "automatic_circuit_reset": false,
+        "challenge_invalidates_other_producers": true,
+        "physical_http_attempts_max": null,
+        "acceptance": "Acquisition marks expired pending grants even on wait/circuit-open; grant creation/consumption advances shared next_allowed_at/updated_at. Every issued request must have a finished response_class/http_status or documented challenge invalidation. Challenge increments circuit_generation and opens policy; invalidates other producers pending/consumed grants and unfinished linkedin_discovery_task_attempts. Compare all preexisting grants and task attempts, not just this job/producer. Circuit-open/unavailable/transport/parser failure is not successful metadata qualification.",
+        "retry_amplification": "Metadata uses MAX_RETRIES=3: one canonical candidate can issue four HTTP requests/grants; first 404 is retried once and each retry acquires a new grant. Job-manager activity has ACTIVE_CHECK_MAX_RETRIES=2. Gate wait calls can expire unrelated pending grants without issuing HTTP; 300-second process deadline is not a database-row write cap."
+      },
+      "minimal_safe_contract": "See workflow-qualification.md: isolated authority rehearsal with unchanged RPCs, or parent-reviewed cycle-scoped claims AND lease reclamation plus isolated publication namespace; no production RPC changes made."
     },
     {
       "id": 244819409,
@@ -456,7 +551,7 @@
       },
       "expected_persistent_outcomes": [
         "One lane membership analyzed_at and updated_at advance only after successful extraction.",
-        "job_keyword_facts replacement and keyword_insights refresh reflect the same job/lane; aggregates can affect more than one aggregate row."
+        "job_keyword_insights replacement and keyword_insights refresh reflect the same job/lane; aggregates can affect more than one aggregate row."
       ],
       "readback": {
         "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
@@ -464,12 +559,13 @@
         "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
         "tables": [
           "job_archetype_memberships",
-          "job_keyword_facts",
+          "job_keyword_insights",
           "keyword_insights"
         ],
-        "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'job_keyword_facts' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_keyword_facts t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'keyword_insights' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.keyword_insights t WHERE to_jsonb(t)->>'archetype' = :'lane';",
+        "fingerprint_sql": "SELECT 'job_archetype_memberships' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_archetype_memberships t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'job_keyword_insights' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.job_keyword_insights t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'keyword_insights' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.keyword_insights t WHERE to_jsonb(t)->>'archetype' = :'lane';",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
@@ -519,24 +615,41 @@
       },
       "expected_persistent_outcomes": [
         "One selected canonical row receives recovered detail metadata/listing instance updates if the upstream page is available.",
-        "Read job metadata, listing_instances and posting-wave fields back; unavailable detail is NOT successful write qualification."
+        "Read job metadata, listing_instances and posting-wave fields back; unavailable detail is NOT successful write qualification.",
+        "Shared request policy/grants and cross-producer discovery task-attempt invalidations require full before/after readback; one selected job does not imply one affected row."
       ],
       "readback": {
         "method": "Independent authenticated target SDK SELECT and privileged SQL comparison of protected pre/post snapshots for all affected tables.",
         "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
         "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
         "tables": [
-          "jobs"
+          "jobs",
+          "linkedin_source_request_policy",
+          "linkedin_source_request_grants",
+          "linkedin_discovery_task_attempts",
+          "canonical_provider_revisions"
         ],
-        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t;\nSELECT 'linkedin_source_request_policy' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_source_request_policy t;\nSELECT 'linkedin_source_request_grants' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_source_request_grants t;\nSELECT 'linkedin_discovery_task_attempts' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.linkedin_discovery_task_attempts t;\nSELECT 'canonical_provider_revisions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.canonical_provider_revisions t;",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Full-table before/after fingerprints are required for shared effects and unchanged outside-scope proof. Independently save exact rows, compare grant IDs/status/producer/key/response_class/http_status/start/finish and policy generation/timing; hashes alone are not semantic acceptance. Fence other writers for attribution; do not job/lane-filter shared gate evidence. Never retry or reset the circuit automatically after interruption/challenge.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume.",
+        "trigger_effects": "jobs maintain_canonical_provider_revision trigger advances shared provider revision on job mutations; jobs canonical_revision and compatibility invalidation fields also require semantic readback."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
         "Publish reviewed qualification source to main before this dispatch command exists.",
-        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
-      ]
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source.",
+        "qualification_archetype validates configuration only; this worker selects globally, not by lane. Approve the actual candidate identity before execution."
+      ],
+      "selection_scope": "one_global_canonical_candidate_not_lane_filtered",
+      "request_gate_envelope": {
+        "scope": "shared_linkedin_source",
+        "automatic_circuit_reset": false,
+        "challenge_invalidates_other_producers": true,
+        "physical_http_attempts_max": 4,
+        "acceptance": "Acquisition marks expired pending grants even on wait/circuit-open; grant creation/consumption advances shared next_allowed_at/updated_at. Every issued request must have a finished response_class/http_status or documented challenge invalidation. Challenge increments circuit_generation and opens policy; invalidates other producers pending/consumed grants and unfinished linkedin_discovery_task_attempts. Compare all preexisting grants and task attempts, not just this job/producer. Circuit-open/unavailable/transport/parser failure is not successful metadata qualification.",
+        "retry_amplification": "Metadata uses MAX_RETRIES=3: one canonical candidate can issue four HTTP requests/grants; first 404 is retried once and each retry acquires a new grant. Job-manager activity has ACTIVE_CHECK_MAX_RETRIES=2. Gate wait calls can expire unrelated pending grants without issuing HTTP; 300-second process deadline is not a database-row write cap."
+      }
     },
     {
       "id": 343823098,
@@ -599,17 +712,22 @@
           "jobs",
           "listing_content_versions",
           "listing_observations",
-          "listing_relist_events"
+          "listing_relist_events",
+          "canonical_provider_revisions"
         ],
-        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_content_versions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_content_versions t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_observations' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_observations t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_relist_events' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_relist_events t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_content_versions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_content_versions t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_observations' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_observations t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'listing_relist_events' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.listing_relist_events t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'canonical_provider_revisions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.canonical_provider_revisions t;",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume.",
+        "trigger_effects": "jobs maintain_canonical_provider_revision trigger advances shared provider revision on job mutations; jobs canonical_revision and compatibility invalidation fields also require semantic readback."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
         "Publish reviewed qualification source to main before this dispatch command exists.",
-        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
-      ]
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source.",
+        "qualification_archetype validates configuration only; this worker selects globally, not by lane. Approve the actual candidate identity before execution."
+      ],
+      "selection_scope": "one_global_canonical_candidate_not_lane_filtered"
     },
     {
       "id": 343823100,
@@ -687,24 +805,31 @@
         "acceptance": "At least one intended successful mutation, exact scope and claims verified; exit zero/no candidates is insufficient.",
         "repeat": "Repeat only idempotent backfill selection after before/after review; do not blindly repeat claim/LLM workers.",
         "tables": [
-          "jobs"
+          "jobs",
+          "canonical_provider_revisions"
         ],
-        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';",
+        "fingerprint_sql": "SELECT 'jobs' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.jobs t WHERE coalesce(to_jsonb(t)->>'job_id',to_jsonb(t)->>'canonical_job_id') = :'job_id';\nSELECT 'canonical_provider_revisions' AS relation, count(*) AS rows, md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text),'')) AS fingerprint FROM public.canonical_provider_revisions t;",
         "fingerprint_command_template": "psql \"service=$QUALIFICATION_PGSERVICE\" -X -v ON_ERROR_STOP=1 -v job_id=\"$QUALIFICATION_JOB_ID\" -v lane=technology_delivery -f \"$QUALIFICATION_SQL_FILE\" > \"$QUALIFICATION_PROTECTED_RECEIPT\"",
-        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented."
+        "fingerprint_caveat": "Save fingerprint_sql as QUALIFICATION_SQL_FILE and run before/after against the independently verified promoted authority. This proves change/no-change, not semantic success; also inspect the exact affected row fields and claim states privately. Resolve the worker-selected IDs from protected before/after snapshots; no fixed ID was invented.",
+        "outside_scope_verification": "Compare full protected snapshots of every listed table, including other job IDs and lanes; candidate fingerprints alone cannot prove absence of collateral writes. Include object bytes/metadata for customization, source object unchanged for parse-resume.",
+        "trigger_effects": "jobs maintain_canonical_provider_revision trigger advances shared provider revision on job mutations; jobs canonical_revision and compatibility invalidation fields also require semantic readback."
       },
       "blockers": [
         "Parent target-promotion identity proof and explicit writer authorization required.",
         "Publish reviewed qualification source to main before this dispatch command exists.",
-        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source."
-      ]
+        "Select eligible real work and record protected pre-run row identities; verify snapshot authority is promoted candidate, not retained source.",
+        "qualification_archetype validates configuration only; this worker selects globally, not by lane. Approve the actual candidate identity before execution."
+      ],
+      "selection_scope": "one_global_canonical_candidate_not_lane_filtered"
     }
   ],
   "local_verification": {
-    "focused": "106 passed, 4 SDK deprecation warnings",
-    "full_changed": "524 passed, 7 failed, 16 SDK deprecation warnings",
-    "full_baseline": "512 passed, same 7 failed, 16 SDK deprecation warnings",
+    "focused": "32 passed: qualification-envelope, workflow qualification, discovery bounds and request policy tests; nine new envelope cases",
+    "full_changed": "591 passed, 6 failed, 16 SDK deprecation warnings; shared worktree including concurrent job-manager/CA fixes",
+    "full_baseline": "524 passed, 7 failed, 16 SDK deprecation warnings at 68f74271211f627465ea12ce61d86674920fd2d3",
     "qualification_shell_blocks_bash_n": 7,
-    "diff_check": "passed"
+    "diff_check": "passed",
+    "baseline_difference": "Exact activity-grant NameError regression fixed; six other baseline failures unchanged.",
+    "restored_ca_bash_blocks": 3
   }
 }

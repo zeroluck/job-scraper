@@ -259,6 +259,7 @@ def _request_page(
     physical_limit: int,
     maximum_lookback_seconds: int | None = None,
     deadline: float | None = None,
+    max_cards: int | None = None,
 ) -> dict[str, Any]:
     page_start = (page_number - 1) * EXPECTED_PAGE_SIZE
     anchor = datetime.fromisoformat(scope["source_window_earliest_at"].replace("Z", "+00:00"))
@@ -344,6 +345,9 @@ def _request_page(
             cards = [] if kind == "no_results" else _position_cards(
                 parse_cards(elements), page_number, page_start
             )
+            if max_cards is not None and len(cards) > max_cards:
+                # Never truncate cards: that would falsely attest complete coverage.
+                raise DiscoveryError("LinkedIn search exceeded qualification card envelope")
             if kind == "cards" and not cards:
                 raise DiscoveryError("LinkedIn search parser extracted zero valid cards")
             gate.finish(grant, kind, response.status_code)
@@ -551,6 +555,8 @@ def _drain_tasks(
         tasks = supabase_utils.claim_linkedin_discovery_tasks(
             worker_id, limit=claim_limit, order_mode=order_mode
         )
+        if len(tasks) > min(claim_limit, remaining):
+            raise DiscoveryError("LinkedIn detail claim envelope exceeded; inspect leases before retry")
         if not tasks:
             if order_mode == "newest":
                 newest_remaining = 0
@@ -649,9 +655,15 @@ def run_discovery(
     detail_fetch: Callable[..., Any],
     save_details: Callable[[dict, str, dict], str],
     partial: bool,
+    qualification: bool = False,
 ) -> DiscoveryResult:
+    if qualification and (not partial or len(executions) != 1):
+        raise DiscoveryError("bounded discovery requires one execution and partial coverage")
     run_started = time.monotonic()
     options = adaptive_options(configuration.settings)
+    if qualification:
+        options.update(minimum=1, soft=1, hard=1, extra=0, detail=1,
+                       attempts=1, detail_attempts=1, search_runtime=60, detail_runtime=60)
     user_agent = os.getenv("LINKEDIN_USER_AGENT") or user_agents.USER_AGENTS[0]
     requested_scope_keys = [
         scope_key(scope_definition(execution, config.LINKEDIN_JOB_TYPE, config.LINKEDIN_F_WT))
@@ -661,6 +673,8 @@ def run_discovery(
         partial=partial,
         scope_keys=requested_scope_keys if partial else None,
     )
+    if qualification and resumable:
+        raise DiscoveryError("qualification envelope forbids resuming shared discovery state")
     if resumable:
         cycle = resumable
         user_agent = str(cycle["pinned_user_agent"])
@@ -669,6 +683,8 @@ def run_discovery(
         ]
     else:
         manifests = _scope_manifest(configuration, executions, options)
+        if qualification and len(manifests) != 1:
+            raise DiscoveryError("qualification envelope requires exactly one scope manifest")
         if options["attempts"] < len(manifests) * options["minimum"]:
             raise DiscoveryError(
                 "max_source_http_attempts_per_run cannot fund every required minimum page"
@@ -690,7 +706,7 @@ def run_discovery(
         execution_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"linkedin-discovery:{execution_key}"))
     if not resumable:
         config_hash = configuration_hash(configuration)
-        for _ in range(10):
+        for _ in range(1 if qualification else 10):
             cycle = supabase_utils.create_linkedin_discovery_cycle(
                 execution_id=execution_id,
                 configuration_revision=configuration.revision,
@@ -732,6 +748,7 @@ def run_discovery(
             physical_limit=options["attempts"],
             maximum_lookback_seconds=options["recovery_cap"] * 3600,
             deadline=run_started + options["search_runtime"],
+            **({'max_cards': 1} if qualification else {}),
         )
         receipt = supabase_utils.commit_linkedin_discovery_page({
             **page,

@@ -6,6 +6,11 @@ on:
       timezone: "America/New_York"
   workflow_dispatch:
     inputs:
+      suppress_notifications:
+        description: "Suppress GitHub gate-watchdog issue writes only; NOT bounded qualification"
+        required: false
+        default: false
+        type: boolean
       lookback_hours:
         description: "LinkedIn posted-time lookback; use 96 for missed-run recovery"
         required: false
@@ -170,7 +175,7 @@ jobs:
     # appearing in hourly logs nobody reads. Closes itself once publishing
     # resumes. The failing requirement rows stay untouched in the database;
     # unblocking remains a reviewed accept_linkedin_discovery_requirement call.
-    if: ${{ always() && (inputs.archetype == '' || inputs.archetype == null) }}
+    if: ${{ always() && !inputs.suppress_notifications && (inputs.archetype == '' || inputs.archetype == null) }}
     needs: [publication_gate]
     runs-on: ubuntu-latest
     timeout-minutes: 5

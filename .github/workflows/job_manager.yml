@@ -5,7 +5,24 @@ on:
   schedule:
     # Runs every day at 17:00 UTC (1:00 AM SGT the next day)
     - cron: "0 17 * * *"
-  workflow_dispatch: # Allows manual triggering from the Actions tab
+  workflow_dispatch:
+    inputs:
+      qualification:
+        description: "REAL bounded expiry and activity writes to two explicit rows"
+        type: boolean
+        default: false
+      qualification_archetype:
+        description: "Canonical lane; verify row membership independently"
+        type: string
+        default: ""
+      qualification_expiry_job_id:
+        description: "Reviewed eligible expiry canonical job ID"
+        type: string
+        default: ""
+      qualification_activity_job_id:
+        description: "Distinct reviewed eligible activity canonical job ID"
+        type: string
+        default: ""
 
 concurrency:
   group: linkedin-freehire-pipeline
@@ -44,4 +61,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Add other secrets if job_manager.py needs them (e.g., proxies if used differently)
-        run: python job_manager.py # Execute the job manager script
+          WORKFLOW_QUALIFICATION: ${{ inputs.qualification }}
+          QUALIFICATION_ARCHETYPE: ${{ inputs.qualification_archetype }}
+          QUALIFICATION_EXPIRY_JOB_ID: ${{ inputs.qualification_expiry_job_id }}
+          QUALIFICATION_ACTIVITY_JOB_ID: ${{ inputs.qualification_activity_job_id }}
+        run: |
+          if [[ "$WORKFLOW_QUALIFICATION" == "true" ]]; then
+            python -m scripts.run_workflow_qualification --workflow job_manager
+          else
+            python job_manager.py
+          fi
