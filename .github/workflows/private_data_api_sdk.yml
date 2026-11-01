@@ -4,8 +4,6 @@ name: Private Data API SDK Qualification
 # storage credentials, claims, publication, scoring, or mutation RPCs.
 on:
   workflow_dispatch:
-  push:
-    branches: [cutover/jobs-native337]
 
 permissions:
   contents: read
