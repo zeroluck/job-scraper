@@ -48,14 +48,19 @@ def atomic_json(path, data):
 
 
 @contextlib.contextmanager
-def locked(state, owner_uid=None):
+def locked(state, owner_uid=None, *, renewal_role=None):
+    if renewal_role is not None and renewal_role not in ROLES:
+        raise ValueError('invalid renewal role')
     if owner_uid is None:
         owner_uid = os.geteuid()
     state = pathlib.Path(state)
     info = state.lstat()
     if state.is_symlink() or info.st_uid != owner_uid or stat.S_IMODE(info.st_mode) != 0o700:
         raise ValueError('unsafe state directory')
-    fd = os.open(state / '.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    # Renewal hooks and receipts are role-specific even when their state is shared.
+    # Preserve the existing common lock for backup/retention callers.
+    name = '.lock' if renewal_role is None else '.lock-renew-' + renewal_role
+    fd = os.open(state / name, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, 'w') as lock:
         info = os.fstat(lock.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != owner_uid:
@@ -270,7 +275,9 @@ def verify_token(cfg, token):
 
 
 def renew(cfg):
-    with locked(cfg['state']) as state:
+    if cfg['role'] not in ROLES:
+        raise ValueError('invalid renewal role')
+    with locked(cfg['state'], renewal_role=cfg['role']) as state:
         token = subprocess.run(cfg['issue'], capture_output=True, check=True,
                                timeout=cfg['timeout']).stdout.decode().strip()
         claims = verify_token(cfg, token)
