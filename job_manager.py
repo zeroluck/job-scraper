@@ -31,7 +31,7 @@ def get_past_date(days: int) -> datetime:
     """Returns the datetime object for a specific number of days ago in UTC."""
     return get_utc_now() - timedelta(days=days)
 
-async def _check_single_linkedin_job_active(job_id: str, client: httpx.AsyncClient) -> bool | None:
+async def _check_single_linkedin_job_active(job_id: str, client: httpx.AsyncClient, *, qualification=False) -> bool | None:
     """
     Checks if a single LinkedIn job is still active.
     Returns:
@@ -92,14 +92,15 @@ async def _check_single_linkedin_job_active(job_id: str, client: httpx.AsyncClie
                  await asyncio.to_thread(
                      _linkedin_request_gate.finish, grant, "http_error", response.status_code
                  )
-                 logging.warning(f"Job {job_id} check failed with status {response.status_code}. Assuming active for now.")
-                 # Decide if other errors mean inactive. For now, only 404 is definitive.
-                 # Could return True here for stricter checking.
-                 return False # Or None if we want to retry later
+                 logging.warning(f"Job {job_id} check failed with status {response.status_code}.")
+                 # Qualification cannot count an indeterminate HTTP response as a successful check.
+                 # Preserve the ordinary scheduler's historical assume-active behavior.
+                 return None if qualification else False
 
-            # Check content for inactive keywords
+            # Normalize both sides; successful 200 responses must close the grant.
+            response_text_lower = response.text.lower()
             for keyword in inactive_keywords:
-                if keyword in response_text_lower:
+                if keyword.lower() in response_text_lower:
                     await asyncio.to_thread(
                         _linkedin_request_gate.finish, grant, "terminal_unavailable", response.status_code
                     )
@@ -141,8 +142,21 @@ async def _check_single_linkedin_job_active(job_id: str, client: httpx.AsyncClie
 
 # --- Main Management Functions ---
 
-async def mark_expired_jobs():
+def _validate_scope(job_id, limit):
+    if job_id is None and limit is None:
+        return
+    if not isinstance(job_id, str) or not job_id.strip() or type(limit) is not int or limit != 1:
+        raise ValueError("qualification requires one explicit job_id and limit=1")
+
+
+def _check_selection(rows, job_id, limit):
+    if job_id is not None and (len(rows) != limit or any(row['job_id'] != job_id for row in rows)):
+        raise RuntimeError("job-manager selection exceeded qualification envelope")
+
+
+async def mark_expired_jobs(*, job_id=None, limit=None):
     """Marks old jobs (not applied/interviewing) as expired."""
+    _validate_scope(job_id, limit)
     logging.info("--- Starting Task: Mark Expired Jobs ---")
     expiry_date = get_past_date(config.JOB_EXPIRY_DAYS)
     # Format for Supabase timestampz query
@@ -151,12 +165,15 @@ async def mark_expired_jobs():
 
     try:
         # Select jobs to expire
-        response = supabase.table(config.SUPABASE_TABLE_NAME)\
+        query = supabase.table(config.SUPABASE_TABLE_NAME)\
             .select("job_id")\
             .lt("last_seen_at", expiry_date_str)\
             .not_.in_("status", excluded_statuses)\
-            .eq("is_active", True)\
-            .execute()
+            .eq("is_active", True)
+        if job_id is not None:
+            query = query.eq("job_id", job_id).limit(limit)
+        response = query.execute()
+        _check_selection(response.data or [], job_id, limit)
 
         if response.data:
             job_ids_to_expire = [job['job_id'] for job in response.data]
@@ -165,10 +182,13 @@ async def mark_expired_jobs():
             if job_ids_to_expire:
                 # Update in batches if necessary, though supabase-py might handle large lists
                 # For simplicity, updating all at once here. Consider batching for >1000s of IDs.
-                update_response = supabase.table(config.SUPABASE_TABLE_NAME)\
+                update_query = supabase.table(config.SUPABASE_TABLE_NAME)\
                     .update({"job_state": "expired", "is_active": False})\
-                    .in_("job_id", job_ids_to_expire)\
-                    .execute()
+                    .in_("job_id", job_ids_to_expire)
+                if job_id is not None:
+                    update_query = update_query.lt("last_seen_at", expiry_date_str).not_.in_("status", excluded_statuses).eq("is_active", True)
+                update_response = update_query.execute()
+                _check_selection(getattr(update_response, 'data', None) or [], job_id, limit)
 
                 # Check response structure - may vary slightly
                 if hasattr(update_response, 'data') and update_response.data:
@@ -185,12 +205,15 @@ async def mark_expired_jobs():
 
     except Exception as e:
         logging.error(f"Error marking expired jobs: {e}")
+        if job_id is not None:
+            raise
 
     logging.info("--- Finished Task: Mark Expired Jobs ---")
 
 
-async def check_linkedin_job_activity():
+async def check_linkedin_job_activity(*, job_id=None, limit=None):
     """Checks if active jobs are still available on LinkedIn."""
+    _validate_scope(job_id, limit)
     logging.info("--- Starting Task: Check Job Activity ---")
     check_older_than_date = get_past_date(config.JOB_CHECK_DAYS)
     check_older_than_date_str = check_older_than_date.isoformat()
@@ -211,7 +234,10 @@ async def check_linkedin_job_activity():
             .order("last_checked", desc=False)\
             .limit(config.JOB_CHECK_LIMIT)
 
+        if job_id is not None:
+            query = query.eq("job_id", job_id).limit(limit)
         response = query.execute()
+        _check_selection(response.data or [], job_id, limit)
 
         if response.data:
             jobs_to_check = response.data
@@ -222,6 +248,8 @@ async def check_linkedin_job_activity():
 
     except Exception as e:
         logging.error(f"Error fetching jobs to check: {e}")
+        if job_id is not None:
+            raise
         return # Cannot proceed
 
     # Use httpx.AsyncClient for connection pooling and efficiency
@@ -229,7 +257,8 @@ async def check_linkedin_job_activity():
         tasks = []
         for job in jobs_to_check:
             live_job_id = job.get("latest_job_id") or job.get("job_id")
-            tasks.append(_check_single_linkedin_job_active(live_job_id, client))
+            check_kwargs = {'qualification': True} if job_id is not None else {}
+            tasks.append(_check_single_linkedin_job_active(live_job_id, client, **check_kwargs))
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
     inactive_job_ids = []
@@ -237,40 +266,51 @@ async def check_linkedin_job_activity():
     failed_check_job_ids = []
 
     for i, result in enumerate(results):
-        job_id = jobs_to_check[i]['job_id']
+        canonical_job_id = jobs_to_check[i]['job_id']
         if isinstance(result, Exception):
-            logging.error(f"Exception checking job {job_id}: {result}")
-            failed_check_job_ids.append(job_id)
+            logging.error(f"Exception checking job {canonical_job_id}: {result}")
+            failed_check_job_ids.append(canonical_job_id)
         elif result is True: # Job confirmed inactive
-            inactive_job_ids.append(job_id)
+            inactive_job_ids.append(canonical_job_id)
         elif result is False: # Job confirmed active
-            active_checked_job_ids.append(job_id)
+            active_checked_job_ids.append(canonical_job_id)
         elif result is None: # Check failed after retries
-            failed_check_job_ids.append(job_id)
+            failed_check_job_ids.append(canonical_job_id)
 
     logging.info(f"Activity Check Summary: Inactive={len(inactive_job_ids)}, Active={len(active_checked_job_ids)}, Failed={len(failed_check_job_ids)}")
+
+    if job_id is not None and failed_check_job_ids:
+        raise RuntimeError("qualification activity check failed; no status inferred")
 
     # Update Supabase
     try:
         if inactive_job_ids:
-            update_inactive = supabase.table(config.SUPABASE_TABLE_NAME)\
+            update_query = supabase.table(config.SUPABASE_TABLE_NAME)\
                 .update({"job_state": "removed", "is_active": False, "last_checked": now_str})\
-                .in_("job_id", inactive_job_ids)\
-                .execute()
+                .in_("job_id", inactive_job_ids)
+            if job_id is not None:
+                update_query = update_query.eq("is_active", True).eq("provider", "linkedin").not_.in_("status", excluded_statuses)
+            update_inactive = update_query.execute()
+            _check_selection(getattr(update_inactive, 'data', None) or [], job_id, limit)
             # Add logging for update_inactive response count/data
             logging.info(f"Marked {len(inactive_job_ids)} jobs as removed. Response: {update_inactive}")
 
 
         if active_checked_job_ids:
-            update_active = supabase.table(config.SUPABASE_TABLE_NAME)\
+            update_query = supabase.table(config.SUPABASE_TABLE_NAME)\
                 .update({"last_checked": now_str})\
-                .in_("job_id", active_checked_job_ids)\
-                .execute()
+                .in_("job_id", active_checked_job_ids)
+            if job_id is not None:
+                update_query = update_query.eq("is_active", True).eq("provider", "linkedin").not_.in_("status", excluded_statuses)
+            update_active = update_query.execute()
+            _check_selection(getattr(update_active, 'data', None) or [], job_id, limit)
             # Add logging for update_active response count/data
             logging.info(f"Updated last_checked for {len(active_checked_job_ids)} active jobs.")
 
     except Exception as e:
         logging.error(f"Error updating job statuses after activity check: {e}")
+        if job_id is not None:
+            raise
 
     logging.info("--- Finished Task: Check Job Activity ---")
 
