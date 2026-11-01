@@ -40,11 +40,10 @@ jobs:
           try:request(context=ssl.create_default_context())
           except urllib.error.URLError as e:assert isinstance(e.reason,ssl.SSLCertVerificationError)
           else:raise AssertionError('untrusted CA accepted')
-          try:
-              with socket.create_connection((host,443),timeout=15) as s:
-                  with trusted.wrap_socket(s,server_hostname='wrong-host.invalid'):pass
-          except ssl.SSLCertVerificationError:pass
-          else:raise AssertionError('wrong hostname accepted')
+          import subprocess
+          # Keep correct SNI so Caddy sends the actual certificate, then demand a wrong hostname.
+          wrong=subprocess.run(['openssl','s_client','-connect',host+':443','-servername',host,'-CAfile',ca,'-verify_hostname','wrong-host.invalid','-verify_return_error'],input=b'',capture_output=True,timeout=20)
+          assert wrong.returncode!=0 and b'hostname mismatch' in wrong.stderr.lower()
           print('Python: trusted signed read200; missing/invalid JWT401; untrusted CA rejected; hostname mismatch rejected')
           PY
       - name: Node trusts only added public CA and verifies signed read
