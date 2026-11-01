@@ -58,8 +58,9 @@ def main():
         for _ in range(100):
             if run('docker','exec',pg,'pg_isready','-h','127.0.0.1','-U','postgres',ok=False).returncode == 0: break
             time.sleep(.1)
-        mounts=json.loads(run('docker','inspect',pg).stdout)[0]['Mounts']
-        check('fixture database is tmpfs without persistent volume',any(m['Destination']=='/var/lib/postgresql/data' and m['Type']=='tmpfs' for m in mounts) and not any(m['Type']=='volume' for m in mounts))
+        instance=json.loads(run('docker','inspect',pg).stdout)[0]
+        mounts=instance['Mounts']
+        check('fixture database is tmpfs without persistent volume','/var/lib/postgresql/data' in instance['HostConfig'].get('Tmpfs',{}) and not any(m['Type']=='volume' for m in mounts))
         sql((HERE/'fixture.sql').read_text())
         snapshot_query = """SELECT json_build_object(
           'relations',(SELECT json_agg(x ORDER BY oid) FROM (SELECT c.oid,relname,relowner,coalesce(relacl,acldefault(CASE WHEN relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,relowner)) AS relacl,relrowsecurity,relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth'))x),
