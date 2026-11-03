@@ -191,6 +191,7 @@ def test_classifier_hard_request_budget_bounds_split_tree(monkeypatch):
             self.calls = 0
 
         def generate_content(self, **_kwargs):
+            _kwargs["request_budget"].consume()
             self.calls += 1
             return '{"jobs":[]}'
 

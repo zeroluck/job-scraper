@@ -27,6 +27,7 @@ import litellm
 from pydantic import BaseModel
 
 import config
+from llm_budget import RequestBudget, RequestBudgetExhausted
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +214,7 @@ class LLMClient:
         reasoning_effort: Optional[str] = None,
         max_api_attempts: Optional[int] = None,
         max_tokens: Optional[int] = None,
+        request_budget: Optional[RequestBudget] = None,
     ) -> str:
         """
         Generate content using the configured LLM.
@@ -241,7 +243,11 @@ class LLMClient:
         messages.append({"role": "user", "content": prompt})
 
         # Build base kwargs for litellm.completion
-        base_kwargs = {"messages": messages, "timeout": self.request_timeout}
+        # Own retries here; neither LiteLLM nor its provider SDK may retry underneath us.
+        base_kwargs = {
+            "messages": messages, "timeout": self.request_timeout,
+            "num_retries": 0, "max_retries": 0,
+        }
 
         if temperature is not None:
             base_kwargs["temperature"] = temperature
@@ -307,6 +313,8 @@ class LLMClient:
                     kwargs["reasoning_effort"] = reasoning_effort
 
                 logger.debug(f"LLM request attempt {attempt + 1}/{max_attempts} to {current_model}")
+                if request_budget is not None:
+                    request_budget.consume()
                 response = litellm.completion(**kwargs)
                 self.last_model_used = current_model
 
@@ -317,6 +325,8 @@ class LLMClient:
                 self._model_cooldowns.pop(current_model, None)
                 return content
 
+            except RequestBudgetExhausted:
+                raise
             except Exception as e:
                 last_exception = e
                 error_str = str(e).lower()

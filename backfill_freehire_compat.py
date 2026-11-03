@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import config
 import freehire_compat
+from llm_budget import RequestBudget
 
 
 SELECT_FIELDS = (
@@ -204,9 +205,12 @@ def run(
     replacement_before: str | datetime | None = None,
     db=None,
     client=None,
+    request_budget: RequestBudget | None = None,
 ) -> dict:
     if limit is not None and limit <= 0:
         raise ValueError("limit must be a positive integer")
+    if request_budget is None:
+        request_budget = RequestBudget(config.FREEHIRE_CLASSIFY_REQUEST_BUDGET)
     replacement_cutoff = _replacement_cutoff(replacement_before)
     if replacement_backfill and replacement_cutoff is None:
         raise ValueError(
@@ -229,12 +233,13 @@ def run(
                 drain_backlog=False,
                 db=db,
                 client=client,
+                request_budget=request_budget,
             )
             if total is None:
                 total = {key: 0 for key in page_result}
             for key, value in page_result.items():
                 total[key] += value
-            if not apply or page_result["scanned"] == 0:
+            if not apply or request_budget.exhausted or page_result["scanned"] == 0:
                 break
             progress = (
                 page_result["classified"]
@@ -355,6 +360,8 @@ def run(
 
     worker_id = str(uuid.uuid4())
     for pending_batch in freehire_compat.pack_batches(pending, model=freehire_compat.model_name(client)):
+        if request_budget.exhausted:
+            break
         claimed_ids = _claim_many(db, pending_batch, worker_id, replacement_cutoff)
         batch = [row for row in pending_batch if str(row["job_id"]) in claimed_ids]
         counts["claimed_elsewhere"] += len(pending_batch) - len(batch)
@@ -364,6 +371,7 @@ def run(
         outcome = freehire_compat.classify_batch(
             batch,
             client=client,
+            request_budget=request_budget,
         )
         counts["llm_requests"] += outcome.requests
         counts["retries"] += outcome.retries

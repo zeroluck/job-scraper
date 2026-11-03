@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from bs4 import BeautifulSoup
 
 import config
+from llm_budget import RequestBudget, RequestBudgetExhausted
 
 
 logger = logging.getLogger(__name__)
@@ -312,15 +313,23 @@ def classify_batch(
     max_retries: int | None = None,
     max_requests: int | None = None,
     sleep_fn=time.sleep,
+    request_budget: RequestBudget | None = None,
 ) -> ClassificationOutcome:
+    """Use one shared completion budget; unfinished budget-limited rows keep their leases.
+
+    Injected clients must consume request_budget at every completion attempt, just
+    like LLMClient. Requests count boundary attempts, not successful responses.
+    """
     if client is None:
         from llm_client import freehire_classify_client
 
         client = freehire_classify_client
     max_retries = max_retries or config.FREEHIRE_CLASSIFY_MAX_RETRIES
-    max_requests = max_requests or config.FREEHIRE_CLASSIFY_REQUEST_BUDGET
+    if request_budget is None:
+        request_budget = RequestBudget(
+            max_requests if max_requests is not None else config.FREEHIRE_CLASSIFY_REQUEST_BUDGET
+        )
     expected = {str(job["job_id"]): job for job in jobs if job.get("job_id") is not None}
-    request_state = {"used": 0}
 
     def global_failure(exc: Exception) -> bool:
         value = f"{type(exc).__name__}: {exc}".casefold()
@@ -337,19 +346,18 @@ def classify_batch(
         for attempt in range(max_retries):
             if not remaining:
                 return outcome
-            if request_state["used"] >= max_requests:
-                last_error = f"request budget exhausted ({max_requests})"
-                break
+            if request_budget.exhausted:
+                return outcome
+            used_before = request_budget.used
             try:
-                request_state["used"] += 1
                 raw = client.generate_content(
                     prompt=_request_prompt(list(remaining.values())),
                     system_prompt=SYSTEM_PROMPT,
                     reasoning_effort="low",
                     response_format=FreehireClassificationBatch,
                     max_api_attempts=2,
+                    request_budget=request_budget,
                 )
-                outcome.requests += 1
                 parsed, errors = _parse_response(raw, set(remaining))
                 outcome.results.update(parsed)
                 used_model = model_name(client)
@@ -358,9 +366,12 @@ def classify_batch(
                 last_error = "; ".join(errors) or (
                     "missing job_ids: " + ", ".join(sorted(remaining))
                 )
+            except RequestBudgetExhausted:
+                return outcome
             except Exception as exc:
-                outcome.requests += 1
                 last_error = str(exc)
+                if request_budget.exhausted:
+                    return outcome
                 if global_failure(exc):
                     logger.error(
                         "Freehire classification stopped after model-pool failure for %s jobs: %s: %s",
@@ -371,12 +382,19 @@ def classify_batch(
                     outcome.global_error = last_error
                     outcome.failures.update({job_id: last_error for job_id in remaining})
                     return outcome
+            finally:
+                outcome.requests += request_budget.used - used_before
+            if request_budget.exhausted and remaining:
+                # Leave unfinished claimed rows to the existing lease/reclaim path.
+                return outcome
             if remaining and attempt < max_retries - 1:
                 outcome.retries += 1
                 delay = config.FREEHIRE_CLASSIFY_RETRY_BASE_SECONDS * (2 ** attempt)
                 sleep_fn(delay + random.uniform(0, delay if delay else 0))
 
-        if len(remaining) > 1 and request_state["used"] < max_requests:
+        if request_budget.exhausted and remaining:
+            return outcome
+        if len(remaining) > 1:
             values = list(remaining.values())
             midpoint = len(values) // 2
             outcome.splits += 1
