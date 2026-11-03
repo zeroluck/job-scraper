@@ -1,0 +1,58 @@
+name: Manual scraper-only sealed-cycle drain
+
+on:
+  workflow_dispatch:
+    inputs:
+      cycle_id:
+        description: "Expected sealed resumable cycle ID from fresh read-only review"
+        required: true
+        type: string
+      discovery_sequence:
+        description: "Expected discovery sequence for the same cycle"
+        required: true
+        type: string
+
+concurrency:
+  group: linkedin-freehire-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    env:
+      JOB_DATA_API_URL: https://pgsql.jdb.l.cd
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      JOB_STORAGE_BACKEND: supabase
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout reviewed repository code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Configure private data API
+        uses: ./.github/actions/configure-data-api
+      - name: Read-only identity and pending-work preflight
+        env: &drain_env
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SCRAPE_ARCHETYPE: ""
+          SCRAPE_CONFIG_SOURCE: db
+          LINKEDIN_DISCOVERY_MODE: adaptive_queue
+          LINKEDIN_DETAIL_ONLY_CYCLE_ID: ${{ inputs.cycle_id }}
+          LINKEDIN_DETAIL_ONLY_SEQUENCE: ${{ inputs.discovery_sequence }}
+        run: python scripts/preflight_scraper_only.py
+      - name: Drain one existing 300-task batch
+        env: *drain_env
+        run: python scraper.py

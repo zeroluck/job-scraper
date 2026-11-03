@@ -641,6 +641,34 @@ def _drain_tasks(
     return saved
 
 
+def require_detail_only_cycle(
+    cycle: dict[str, Any] | None, options: dict[str, int], *, partial: bool
+) -> None:
+    """Opt-in manual drain guard; never create/search a replacement cycle."""
+    expected_id = os.getenv("LINKEDIN_DETAIL_ONLY_CYCLE_ID")
+    expected_sequence = os.getenv("LINKEDIN_DETAIL_ONLY_SEQUENCE")
+    if expected_id is None and expected_sequence is None:
+        return
+    if (
+        not expected_id or not expected_id.isascii() or not expected_id.isdecimal()
+        or not expected_sequence or not expected_sequence.isascii()
+        or not expected_sequence.isdecimal()
+        or int(expected_id) < 1 or int(expected_sequence) < 1
+        or partial or not cycle or cycle.get("search_status") != "sealed"
+        or cycle.get("cycle_id") != int(expected_id)
+        or cycle.get("discovery_sequence") != int(expected_sequence)
+    ):
+        raise DiscoveryError("detail-only sealed cycle identity preflight failed")
+    if options["detail"] != 300:
+        raise DiscoveryError("detail-only requires the existing 300-task limit")
+    response = (
+        supabase_utils.supabase.table("linkedin_discovery_tasks")
+        .select("id", count="exact", head=True).eq("status", "pending").execute()
+    )
+    if type(response.count) is not int or response.count < 1:
+        raise DiscoveryError("detail-only requires pending tasks")
+
+
 def run_discovery(
     configuration: Any,
     executions: Sequence[Any],
@@ -661,6 +689,7 @@ def run_discovery(
         partial=partial,
         scope_keys=requested_scope_keys if partial else None,
     )
+    require_detail_only_cycle(resumable, options, partial=partial)
     if resumable:
         cycle = resumable
         user_agent = str(cycle["pinned_user_agent"])
