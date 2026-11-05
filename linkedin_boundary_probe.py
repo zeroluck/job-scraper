@@ -166,7 +166,8 @@ def private_write(path, data):
 
 
 def capture(target, view, offset, gate, boundary, original, output, user_agent):
-    if view not in {'baseline', 'DD', 'interactive'} or offset not in {0, 240, 250, 260, 300}:
+    offsets = {0, 60, 120, 180, 240, 250, 260, 300} if view == 'interactive' else {0, 240, 250, 260, 300}
+    if view not in {'baseline', 'DD', 'interactive'} or offset not in offsets:
         raise RuntimeError('unreviewed diagnostic unit')
     if boundary.attempts >= boundary.limit:
         raise RuntimeError('physical GET budget exhausted')
@@ -268,7 +269,11 @@ def verify_targets(targets, definitions):
             raise RuntimeError('original wire query/geography/filter mismatch')
 
 
-def plan():
+def plan(mode='boundary'):
+    if mode == 'interactive-pagination':
+        return [('interactive', n) for n in (0,60,120,180,240,250,260,300)]
+    if mode != 'boundary':
+        raise RuntimeError('unreviewed diagnostic mode')
     return ([('baseline', n) for n in (240,250,260,300,240)]
             + [('DD', n) for n in (0,240,250,260,300)]
             + [('baseline',0), ('interactive',0)])
@@ -280,6 +285,8 @@ def config_digest(document):
 
 def run(args):
     require_authorization(args.authorization)
+    mode = getattr(args, 'mode', 'boundary')
+    units = plan(mode)  # Reject unreviewed modes before any client or gate call.
     # This endpoint guard is independent of parent DB-admin identity checks.
     # The probe does not possess an administrative credential or impersonate one.
     if os.environ.get('JOB_DATA_API_URL') != args.expected_endpoint:
@@ -320,10 +327,19 @@ def run(args):
         gate = original.DurableLinkedInRequestGate('source-boundary-evidence', db=db)
         receipts = []
         try:
-            for view, offset in plan():
+            for view, offset in units:
                 receipts.append(capture(sentinel, view, offset, gate, boundary, original, output, user_agent))
         finally:
+            raw_sets = [set(r['raw_urn_ids']) | set(r['raw_link_ids']) for r in receipts]
             private_write(output / 'summary.json', (json.dumps({
+                'mode': mode,
+                'raw_id_union': sorted(set().union(*raw_sets)),
+                'pairwise_raw_id_overlap': [
+                    {'left_unit': receipts[i]['unit'], 'right_unit': receipts[j]['unit'],
+                     'left_count': len(left), 'right_count': len(right),
+                     'intersection_ids': sorted(left & right),
+                     'same_raw_id_set': left == right}
+                    for i, left in enumerate(raw_sets) for j, right in enumerate(raw_sets) if i < j],
                 'physical_gets': boundary.attempts, 'all_parent_count': len(targets),
                 'original_interval_count': sum(len(t['original_gap_intervals']) for t in targets),
                 'configuration_sha256': config_digest(raw), 'inventory_complete': False,
@@ -337,6 +353,7 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mode', choices=('boundary', 'interactive-pagination'), default='boundary')
     parser.add_argument('--authorization', required=True)
     parser.add_argument('--expected-endpoint', required=True)
     parser.add_argument('--expected-config-sha256', required=True)

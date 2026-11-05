@@ -3,6 +3,14 @@ name: Manual LinkedIn source-boundary evidence
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: "Reviewed evidence-only plan; neither mode ingests or proves completeness"
+        type: choice
+        required: true
+        default: boundary
+        options:
+          - boundary
+          - interactive-pagination
       recipient_cert_b64:
         description: "Base64 public PEM X509 recipient certificate only; never supply a private key"
         type: string
@@ -44,6 +52,7 @@ jobs:
       PROBE_EXPECTED_ENDPOINT: ${{ inputs.expected_endpoint }}
       PROBE_CONFIG_SHA256: ${{ inputs.expected_config_sha256 }}
       PROBE_UA_SHA256: ${{ inputs.expected_user_agent_sha256 }}
+      PROBE_MODE: ${{ inputs.mode }}
     steps:
       - name: Validate public encryption recipient before any probe
         id: recipient
@@ -74,6 +83,7 @@ jobs:
         run: |
           umask 077
           python linkedin_boundary_probe.py \
+            --mode "$PROBE_MODE" \
             --authorization "$PROBE_AUTHORIZATION" \
             --expected-endpoint "$PROBE_EXPECTED_ENDPOINT" \
             --expected-config-sha256 "$PROBE_CONFIG_SHA256" \
