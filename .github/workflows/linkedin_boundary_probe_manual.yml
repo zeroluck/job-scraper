@@ -1,0 +1,104 @@
+name: Manual LinkedIn source-boundary evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient_cert_b64:
+        description: "Base64 public PEM X509 recipient certificate only; never supply a private key"
+        type: string
+        required: true
+      authorization:
+        description: "After independent DB identity and drained-worker check: evidence-only-gate-writes-approved"
+        type: string
+        required: true
+      expected_endpoint:
+        description: "Exact reviewed JOB_DATA_API_URL; endpoint check is not DB-admin identity"
+        type: string
+        required: true
+      expected_config_sha256:
+        description: "Fresh full actual config canonical JSON SHA256 (not recovery-cap export)"
+        type: string
+        required: true
+      expected_user_agent_sha256:
+        description: "Original default/pinned cycle user-agent SHA256; mismatch stops"
+        type: string
+        required: true
+
+concurrency:
+  group: linkedin-freehire-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      JOB_DATA_API_URL: ${{ vars.JOB_DATA_API_URL }}
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      # Existing trust action requires this flag; no Storage credential is supplied.
+      JOB_STORAGE_BACKEND: supabase
+      PROBE_AUTHORIZATION: ${{ inputs.authorization }}
+      PROBE_EXPECTED_ENDPOINT: ${{ inputs.expected_endpoint }}
+      PROBE_CONFIG_SHA256: ${{ inputs.expected_config_sha256 }}
+      PROBE_UA_SHA256: ${{ inputs.expected_user_agent_sha256 }}
+    steps:
+      - name: Validate public encryption recipient before any probe
+        id: recipient
+        shell: bash
+        env:
+          RECIPIENT_CERT_B64: ${{ inputs.recipient_cert_b64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -m 700 "$RUNNER_TEMP/linkedin-boundary-recipient"
+          python - <<'PY'
+          import base64, os
+          from pathlib import Path
+          cert = base64.b64decode(os.environ['RECIPIENT_CERT_B64'], validate=True)
+          if b'PRIVATE KEY' in cert or cert.count(b'-----BEGIN CERTIFICATE-----') != 1:
+              raise SystemExit('Expected one public PEM X509 certificate, never a private key')
+          Path(os.environ['RUNNER_TEMP'], 'linkedin-boundary-recipient', 'recipient.pem').write_bytes(cert)
+          PY
+          openssl x509 -in "$RUNNER_TEMP/linkedin-boundary-recipient/recipient.pem" -noout
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - uses: ./.github/actions/configure-data-api
+      - name: Evidence-only probe; no scheduler, detail ingestion or finalization
+        shell: bash
+        run: |
+          umask 077
+          python linkedin_boundary_probe.py \
+            --authorization "$PROBE_AUTHORIZATION" \
+            --expected-endpoint "$PROBE_EXPECTED_ENDPOINT" \
+            --expected-config-sha256 "$PROBE_CONFIG_SHA256" \
+            --expected-user-agent-sha256 "$PROBE_UA_SHA256" \
+            --output "$RUNNER_TEMP/linkedin-boundary-evidence"
+      - name: Package and recipient-encrypt evidence even on interruption
+        if: always() && steps.recipient.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz" "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz.cms.pending"' EXIT
+          if test -d "$RUNNER_TEMP/linkedin-boundary-evidence"; then
+            tar -czf "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz" -C "$RUNNER_TEMP" linkedin-boundary-evidence
+            chmod 600 "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz"
+            openssl cms -encrypt -binary -aes-256-cbc -outform DER \
+              -in "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz" \
+              -out "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz.cms.pending" \
+              "$RUNNER_TEMP/linkedin-boundary-recipient/recipient.pem"
+            mv "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz.cms.pending" "$RUNNER_TEMP/linkedin-boundary-evidence.tar.gz.cms"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linkedin-boundary-protected-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/linkedin-boundary-evidence.tar.gz.cms
+          retention-days: 7
+          if-no-files-found: warn
