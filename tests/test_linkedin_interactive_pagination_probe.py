@@ -78,7 +78,7 @@ def test_manual_workflow_mode_choice_defaults_to_original_plan(probe):
     mode = workflow['on']['workflow_dispatch']['inputs']['mode']
     assert mode == {'description': 'Reviewed evidence-only plan; neither mode ingests or proves completeness',
                     'type': 'choice', 'required': 'true', 'default': 'boundary',
-                    'options': ['boundary', 'interactive-pagination']}
+                    'options': ['boundary', 'interactive-pagination', 'work-mode-facets']}
     job = workflow['jobs']['evidence']
     assert job['env']['PROBE_MODE'] == '${{ inputs.mode }}'
     step = next(s for s in job['steps'] if 'python linkedin_boundary_probe.py' in s.get('run', ''))

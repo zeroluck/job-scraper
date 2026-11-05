@@ -165,15 +165,21 @@ def private_write(path, data):
         stream.write(data)
 
 
-def capture(target, view, offset, gate, boundary, original, output, user_agent):
+def capture(target, view, offset, gate, boundary, original, output, user_agent, work_type=None):
     offsets = {0, 60, 120, 180, 240, 250, 260, 300} if view == 'interactive' else {0, 240, 250, 260, 300}
     if view not in {'baseline', 'DD', 'interactive'} or offset not in offsets:
         raise RuntimeError('unreviewed diagnostic unit')
+    if work_type is not None and (type(work_type) is not str or work_type not in {'1', '2', '3'}
+            or view != 'baseline' or offset not in {0, 240, 250}
+            or work_type not in target['definition']['work_types']):
+        raise RuntimeError('unreviewed work-mode facet')
     if boundary.attempts >= boundary.limit:
         raise RuntimeError('physical GET budget exhausted')
     boundary.pace()
     definition = target['definition']
     unit = f"{target['scope_key']}:{view}:{offset}:{boundary.attempts}"
+    if work_type is not None:
+        unit += f':f_WT={work_type}:diagnostic'
     grant = gate.acquire('search', unit, deadline=boundary.deadline)
     status, kind = None, 'probe_error'
     opened = False
@@ -182,6 +188,9 @@ def capture(target, view, offset, gate, boundary, original, output, user_agent):
                'scope_parent_hash': target['scope_key'].rsplit(':', 1)[1],
                'bound_contract': 'lower_only', 'inventory_complete': False,
                'variant_support': 'unverified_diagnostic' if view != 'baseline' else 'original_baseline'}
+    if work_type is not None:
+        receipt.update(applied_facet={'f_WT': work_type}, filter_semantics='unverified',
+                       variant_support='unverified_diagnostic')
     index = boundary.attempts
     try:
         seconds = math.ceil((grant.started_at - ANCHOR).total_seconds())
@@ -192,6 +201,8 @@ def capture(target, view, offset, gate, boundary, original, output, user_agent):
         if any(ANCHOR > datetime.fromisoformat(a) or grant.started_at < datetime.fromisoformat(b) for a, b in INTERVALS):
             raise RuntimeError('source window does not contain all original intervals')
         params = dict(target['query_params'], start=offset, f_TPR=f'r{seconds}')
+        if work_type is not None:
+            params['f_WT'] = work_type
         if view == 'DD':
             params['sortBy'] = 'DD'
         path = '/jobs/search' if view == 'interactive' else GUEST
@@ -270,6 +281,10 @@ def verify_targets(targets, definitions):
 
 
 def plan(mode='boundary'):
+    if mode == 'work-mode-facets':
+        return ([('baseline', 0)] +
+                [('baseline', offset, facet) for facet in ('1', '2', '3') for offset in (0, 240, 250)] +
+                [('baseline', 0)])
     if mode == 'interactive-pagination':
         return [('interactive', n) for n in (0,60,120,180,240,250,260,300)]
     if mode != 'boundary':
@@ -281,6 +296,30 @@ def plan(mode='boundary'):
 
 def config_digest(document):
     return hashlib.sha256(json.dumps(document, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode()).hexdigest()
+
+
+def work_mode_comparison(receipts):
+    """Set observations only: changed rankings do not verify facet semantics."""
+    ids = lambda r: set(r['raw_urn_ids']) | set(r['raw_link_ids'])
+    controls = [r for r in receipts if not r.get('applied_facet')]
+    facets = [r for r in receipts if r.get('applied_facet')]
+    control_ids = set().union(*(ids(r) for r in controls))
+    facet_ids = set().union(*(ids(r) for r in facets))
+    by_offset = []
+    for offset in (0, 240, 250):
+        rows = [r for r in facets if r['offset'] == offset]
+        complete = {r['applied_facet']['f_WT'] for r in rows} == {'1', '2', '3'}
+        by_offset.append({'offset': offset, 'all_facets_observed': complete,
+                          'same_raw_id_set': all(ids(r) == ids(rows[0]) for r in rows) if complete else None})
+    return {
+        'filter_semantics': 'unverified', 'partition_complete': False,
+        'unknown_work_modes_remain_in_original_parent': True, 'ingestion_authorized': False,
+        'baseline_repeat_same_raw_id_set': ids(controls[0]) == ids(controls[1]) if len(controls) == 2 else None,
+        'same_offset_all_facets_same_raw_id_set': all(r['same_raw_id_set'] for r in by_offset)
+            if all(r['all_facets_observed'] for r in by_offset) else None,
+        'same_offset_comparisons': by_offset,
+        'candidate_ids_not_in_controls': sorted(facet_ids - control_ids),
+        'interpretation': 'Identical sets are consistent with ignored filters, not proof. Different sets or control deltas show diagnostic utility, not verified work-mode membership. Compare every retained original sentinel page before declaring actual new IDs; no ingestion until actual ID delta and guarded original persistence path are proven.'}
 
 
 def run(args):
@@ -327,12 +366,15 @@ def run(args):
         gate = original.DurableLinkedInRequestGate('source-boundary-evidence', db=db)
         receipts = []
         try:
-            for view, offset in units:
-                receipts.append(capture(sentinel, view, offset, gate, boundary, original, output, user_agent))
+            for unit in units:
+                view, offset = unit[:2]
+                facet = {'work_type': unit[2]} if len(unit) == 3 else {}
+                receipts.append(capture(sentinel, view, offset, gate, boundary, original, output, user_agent, **facet))
         finally:
             raw_sets = [set(r['raw_urn_ids']) | set(r['raw_link_ids']) for r in receipts]
             private_write(output / 'summary.json', (json.dumps({
                 'mode': mode,
+                **({'work_mode_comparison': work_mode_comparison(receipts)} if mode == 'work-mode-facets' else {}),
                 'raw_id_union': sorted(set().union(*raw_sets)),
                 'pairwise_raw_id_overlap': [
                     {'left_unit': receipts[i]['unit'], 'right_unit': receipts[j]['unit'],
@@ -353,7 +395,7 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--mode', choices=('boundary', 'interactive-pagination'), default='boundary')
+    parser.add_argument('--mode', choices=('boundary', 'interactive-pagination', 'work-mode-facets'), default='boundary')
     parser.add_argument('--authorization', required=True)
     parser.add_argument('--expected-endpoint', required=True)
     parser.add_argument('--expected-config-sha256', required=True)

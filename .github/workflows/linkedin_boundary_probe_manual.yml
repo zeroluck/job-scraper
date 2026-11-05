@@ -11,6 +11,7 @@ on:
         options:
           - boundary
           - interactive-pagination
+          - work-mode-facets
       recipient_cert_b64:
         description: "Base64 public PEM X509 recipient certificate only; never supply a private key"
         type: string
