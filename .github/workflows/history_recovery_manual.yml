@@ -1,0 +1,57 @@
+name: Manual historical recovery candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "new only after guarded cycle54 drain; resume requires exact broad cycle identity"
+        type: choice
+        options: [new, resume]
+        required: true
+      cycle_id:
+        description: "Exact broad recovery cycle ID for resume (must exceed 54)"
+        type: string
+        default: ""
+      discovery_sequence:
+        description: "Exact broad recovery sequence for resume (must exceed 54)"
+        type: string
+        default: ""
+
+concurrency:
+  group: linkedin-freehire-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      JOB_DATA_API_URL: ${{ vars.JOB_DATA_API_URL }}
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      JOB_STORAGE_BACKEND: supabase
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SCRAPE_ARCHETYPE: ""
+      LINKEDIN_DISCOVERY_MODE: adaptive_queue
+      LINKEDIN_HISTORY_RECOVERY: ${{ inputs.mode }}
+      LINKEDIN_HISTORY_CYCLE_ID: ${{ inputs.cycle_id }}
+      LINKEDIN_HISTORY_SEQUENCE: ${{ inputs.discovery_sequence }}
+      LINKEDIN_HISTORY_TARGETS: recovery_parameters.json
+      LINKEDIN_RECOVERY_LOOKBACK_HOURS: "2160"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - uses: ./.github/actions/configure-data-api
+      - name: Full actual configuration export; no database configuration writes
+        run: python history_recovery.py --output "$RUNNER_TEMP/history-configuration.json"
+      - name: Original guarded scraper; no classification or publication workflow
+        env:
+          SCRAPE_CONFIG_SOURCE: file
+          SCRAPE_CONFIG_FILE: ${{ runner.temp }}/history-configuration.json
+        run: python scraper.py

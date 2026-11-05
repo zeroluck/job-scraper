@@ -1,0 +1,717 @@
+[
+  {
+    "scope_key": "linkedin:v1:046e08198d2aedacecbe4af9de3a14608274c52f53e9f963c480cdb2b6785f03",
+    "definition": {
+      "lane": "building_controls",
+      "query": "industrial controls engineer PLC SCADA commissioning",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "recall",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "industrial controls engineer PLC SCADA commissioning",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:1f5c69d019e90f5c86ac0c6d1e0e25df020fcc67da2d00d3cf2964eab61ebc5d",
+    "definition": {
+      "lane": "network_infrastructure",
+      "query": "Network Administrator",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "recall",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "Network Administrator",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:4003267113ea576bf25877dbf6e72cdc737969574a3c66ed384aced2f6eb1d7d",
+    "definition": {
+      "lane": "technology_delivery",
+      "query": "gestionnaire de projet informatique TI",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "fr",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "gestionnaire de projet informatique TI",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:4d2b72a8448361487ba0f5458743457ad5cfadb7d6b2bad97dd1838195f63d80",
+    "definition": {
+      "lane": "technology_delivery",
+      "query": "IT technology project manager",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "recall",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "IT technology project manager",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:548a680c8b2d79f7beee869b031ce64342fd4cd4fc8c97df5453940b04fec120",
+    "definition": {
+      "lane": "datacenter_operations",
+      "query": "Data Center Technician",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "Data Center Technician",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:6164f764d9d7f2b9603417f5b4bf74ef82ee8f9a2f36181dbd38dc6f1ee70bf3",
+    "definition": {
+      "lane": "building_controls",
+      "query": "building automation controls specialist BAS BACnet",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "building automation controls specialist BAS BACnet",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:7f401f68f615611298e2f41eb0bf57c2613684d4bf45e7b91a1dc037b915c9b9",
+    "definition": {
+      "lane": "systems_platform_ops",
+      "query": "systems administrator infrastructure operations",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "recall",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "systems administrator infrastructure operations",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:b4145186ccee444c64e1b6373a1966cf50cfe6fff069bcf1f4282f2d06615273",
+    "definition": {
+      "lane": "technology_delivery",
+      "query": "technical program delivery manager",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "technical program delivery manager",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:b4cca647aa01e69393b02ab10d5eb1ab3853269bb012b5505be0a2de3792b6f0",
+    "definition": {
+      "lane": "datacenter_operations",
+      "query": "Data Centre Technician",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "recall",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "Data Centre Technician",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:b99bf013c0bdd4673202f8eb2e305939945a8bc6c3adb2d785806c20efa60c4d",
+    "definition": {
+      "lane": "ai_workflow_automation",
+      "query": "AI solutions engineer LLM workflow integration",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "recall",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "AI solutions engineer LLM workflow integration",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:cd50fedc819d31513b601a38ead52eec3f5e37adace63dfd6c485e2e2f7cce0a",
+    "definition": {
+      "lane": "network_infrastructure",
+      "query": "Network Engineer",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "Network Engineer",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:e6d1b0264df1b5a26aa5cdf69d6011a0639340b9a6fe9aaec3c569b285e9dff3",
+    "definition": {
+      "lane": "ai_workflow_automation",
+      "query": "agentic AI engineer RAG workflow automation",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "agentic AI engineer RAG workflow automation",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  },
+  {
+    "scope_key": "linkedin:v1:f6273c9a0a41ebdcf5e8a54dc03712e82fc45cbdb95c61a217312778fad57c06",
+    "definition": {
+      "lane": "systems_platform_ops",
+      "query": "VMware virtualization infrastructure administrator",
+      "geo_id": 101174742,
+      "version": "linkedin-scope-v1",
+      "endpoint": "jobs-guest-search-v1",
+      "job_type": "F",
+      "language": "en",
+      "location": "Canada",
+      "provider": "linkedin",
+      "query_type": "precision",
+      "work_types": [
+        "1",
+        "2",
+        "3"
+      ],
+      "geography_id": "CA",
+      "location_scope": "canada",
+      "partition_filters": {},
+      "geography_mapping_version": "static-v1"
+    },
+    "original_gap_intervals": [
+      {
+        "earliest_at": "2026-09-15T21:32:36.890075+00:00",
+        "latest_at": "2026-09-17T23:18:37.539668+00:00",
+        "seconds": 179160.649593
+      },
+      {
+        "earliest_at": "2026-09-30T10:35:52.865851+00:00",
+        "latest_at": "2026-10-02T06:21:19.632152+00:00",
+        "seconds": 157526.766301
+      },
+      {
+        "earliest_at": "2026-10-09T06:21:19.632152+00:00",
+        "latest_at": "2026-10-27T20:53:06.886095+00:00",
+        "seconds": 1607507.253943
+      }
+    ],
+    "computed_at": "2026-11-04T03:03:55.445607+00:00",
+    "minimum_broad_lookback_hours_with_6h_margin": 1188,
+    "recommended_cap_hours": 2160,
+    "relative_filter": "r4276800",
+    "query_params": {
+      "keywords": "VMware virtualization infrastructure administrator",
+      "location": "Canada",
+      "geoId": 101174742,
+      "f_JT": "F",
+      "f_WT": "1,2,3",
+      "start": 0
+    },
+    "requires_complete_page_drain": true,
+    "debt_reconciliation_authorized": false
+  }
+]

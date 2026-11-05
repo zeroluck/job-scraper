@@ -690,6 +690,11 @@ def run_discovery(
         scope_keys=requested_scope_keys if partial else None,
     )
     require_detail_only_cycle(resumable, options, partial=partial)
+    import history_recovery
+    history_recovery.require_selection(
+        resumable, options, partial=partial, scope_keys=requested_scope_keys
+    )
+    history_recovery.require_drained_queue(supabase_utils.supabase)
     if resumable:
         cycle = resumable
         user_agent = str(cycle["pinned_user_agent"])
@@ -735,6 +740,11 @@ def run_discovery(
             ))
         else:
             raise DiscoveryError("discovery recovery chain exceeded 10 failed executions")
+    if not resumable and os.getenv("LINKEDIN_HISTORY_RECOVERY") == "new":
+        cycle = history_recovery.hydrate_created_cycle(
+            cycle, supabase_utils.get_resumable_linkedin_discovery_cycle
+        )
+    history_recovery.require_manifest(cycle)
     cycle_id = cycle["cycle_id"]
     sequence = int(cycle["discovery_sequence"])
     cycle_status = cycle.get("search_status", "running")
