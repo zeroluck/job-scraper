@@ -28,12 +28,11 @@ def test_authoritative_sql_matches_required_web_history_mirror():
 
 def test_native_applied_sql_cannot_be_silently_rewritten(tmp_path):
     import hashlib
-    from scripts.check_migration_drift import history_hash
     setup=tmp_path/"supabase_setup"
     setup.mkdir()
     migration=setup/"fixture.sql"
     migration.write_text("SELECT 1;\n")
-    manifest={"applied":[],"history_hash":history_hash([]),"grandfathered":{},"local_only":{},
+    manifest={"applied":[],"history_hash":hashlib.md5(b"").hexdigest(),"grandfathered":{},"local_only":{},
         "owned":{"fixture":{"files":["job-scraper:supabase_setup/fixture.sql"]}},
         "native_applied":[{"name":"fixture","migration_sha256":{"fixture.sql":hashlib.sha256(migration.read_bytes()).hexdigest()}}]}
     (setup/"migration_manifest.json").write_text(json.dumps(manifest))
