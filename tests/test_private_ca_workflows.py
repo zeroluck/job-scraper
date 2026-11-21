@@ -50,7 +50,7 @@ def test_every_database_job_has_target_only_data_and_separate_source_storage():
 def test_qualification_workflow_is_manual_read_only_and_has_no_storage_credentials():
     workflow = yaml.safe_load((ROOT / '.github/workflows/private_data_api_sdk.yml').read_text())
     assert workflow[True] == {'workflow_dispatch': None}
-    assert workflow['permissions'] == {'contents': 'read'}
+    assert workflow['permissions'] == {'contents': 'read', 'actions': 'read'}
     assert list(workflow['jobs']) == ['qualify_sdk']
     job = workflow['jobs']['qualify_sdk']
     assert job['timeout-minutes'] == 5

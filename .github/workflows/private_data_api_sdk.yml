@@ -1,11 +1,12 @@
 name: Private Data API SDK Qualification
 
 # Deliberately isolated: no schedules, workflow_run, production workers,
-# storage credentials, claims, publication, scoring, or mutation RPCs.
+# storage credentials, claims, publication finalization, scoring, or mutation RPCs.
 on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -23,8 +24,33 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install focused SDK dependencies
-        run: python -m pip install supabase certifi
+        run: python -m pip install supabase certifi python-dotenv
       - name: Configure private data API
         uses: ./.github/actions/configure-data-api
+      - name: Measure read-only operational health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/linkedin_health.py
+      - name: Qualify interrupted-run publication reporting without finalization
+        run: |
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          import publication_gate
+          def forbidden(*args, **kwargs):
+              raise AssertionError("Read-only qualification must never finalize publication")
+          publication_gate.finalize_publication = forbidden
+          sys.argv = ["publication_gate.py", "--scrape-result", "failure", "--freehire-compat-result", "success"]
+          try:
+              publication_gate.main()
+          except RuntimeError as error:
+              assert "pipeline jobs did not succeed" in str(error), type(error).__name__
+          else:
+              raise AssertionError("Upstream failure was swallowed")
+          outputs = dict(line.split("=", 1) for line in Path(os.environ["GITHUB_OUTPUT"]).read_text().splitlines())
+          assert outputs["outcome"] == "deferred"
+          assert int(outputs["generation"]) > 0 and int(outputs["row_count"]) >= 0
+          print("Expected upstream failure retained after actual immutable-state reporting; no finalizer called.")
+          PY
       - name: Qualify signed SDK GET and read-only configuration RPC
         run: python -m scripts.qualify_data_api
