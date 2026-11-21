@@ -24,7 +24,7 @@ def main():
     configuration = load_scrape_configuration(db=supabase_utils.supabase)
     cycle = supabase_utils.get_resumable_linkedin_discovery_cycle(partial=False)
     require_detail_only_cycle(cycle, adaptive_options(configuration.settings), partial=False)
-    print("Read-only identity/pending preflight passed; sealed cycle and 300-task limit verified")
+    print("Read-only identity/actionable preflight passed; sealed cycle and 300-task limit verified")
 
 
 if __name__ == "__main__":

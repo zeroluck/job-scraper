@@ -1338,6 +1338,11 @@ def apply_linkedin_discovery_task_canonical(
                 result.get("canonical_revision"),
                 result.get("provider_candidate_set_revision"),
             )
+        logging.info(
+            "Canonical task receipt: task_id=%s source_job_id=%s canonical_job_id=%s outcome=%s action=%s completed_at=%s",
+            task_snapshot["id"], task_snapshot.get("source_job_id"), canonical_job_id,
+            outcome, result.get("action"), result.get("completed_at"),
+        )
         return canonical_job_id
     raise RuntimeError("canonical task application exhausted stale-plan retries")
 
@@ -1798,6 +1803,22 @@ def finish_linkedin_request_grant(
     return value
 
 
+def finish_linkedin_request_feedback(
+    grant_id: str, producer: str, response_class: str, http_status: int | None,
+    *, retry_after_seconds: int | None, response_headers: dict, execution_metadata: dict,
+    db: Any = None,
+) -> bool:
+    response = (db or supabase).rpc("finish_linkedin_request_feedback", {
+        "p_grant_id": grant_id, "p_producer": producer,
+        "p_response_class": response_class, "p_http_status": http_status,
+        "p_retry_after_seconds": retry_after_seconds,
+        "p_response_headers": response_headers, "p_execution_metadata": execution_metadata,
+    }).execute()
+    if type(response.data) is not bool:
+        raise RuntimeError("finish_linkedin_request_feedback returned an invalid response")
+    return response.data
+
+
 def open_linkedin_source_circuit(
     grant_id: str,
     producer: str,
@@ -1837,6 +1858,14 @@ def reset_linkedin_source_circuit(
         value = value[0]
     if not isinstance(value, bool):
         raise RuntimeError("reset_linkedin_source_circuit returned an invalid response")
+    return value
+
+
+def linkedin_actionable_task_count(*, db: Any = None) -> int:
+    response = (db or supabase).rpc("linkedin_actionable_task_count", {}).execute()
+    value = response.data
+    if type(value) is not int or value < 0:
+        raise RuntimeError("linkedin_actionable_task_count returned an invalid response")
     return value
 
 

@@ -48,7 +48,7 @@ def test_gate_propagates_open_circuit(monkeypatch):
 def test_gate_rejects_invalidated_finish(monkeypatch):
     monkeypatch.setattr(
         linkedin_source_policy.supabase_utils,
-        "finish_linkedin_request_grant",
+        "finish_linkedin_request_feedback",
         lambda *_args, **_kwargs: False,
     )
 
@@ -79,3 +79,49 @@ def test_gate_does_not_sleep_past_request_deadline(monkeypatch):
         linkedin_source_policy.DurableLinkedInRequestGate("test").acquire(
             "search", "scope-1", deadline=10.5
         )
+
+
+def test_feedback_retains_retry_after_but_never_cookie_headers(monkeypatch):
+    from types import SimpleNamespace
+    calls=[]
+    monkeypatch.setattr(linkedin_source_policy.supabase_utils,"finish_linkedin_request_feedback",
+        lambda *args,**kwargs: calls.append((args,kwargs)) or True)
+    gate=linkedin_source_policy.DurableLinkedInRequestGate("test")
+    grant=linkedin_source_policy.ConsumedGrant("g",linkedin_source_policy.datetime.now())
+    gate.finish(grant,"http_error",429,response=SimpleNamespace(headers={"Retry-After":"180","Set-Cookie":"private","Authorization":"private"}))
+    assert calls[0][1]["retry_after_seconds"]==180
+    assert calls[0][1]["response_headers"]=={"retry-after":"180"}
+
+
+@pytest.mark.parametrize("kind",["search","detail"])
+def test_redirect_cannot_multiply_physical_requests_under_one_grant(monkeypatch,kind):
+    from datetime import datetime,timezone
+    import requests
+    import linkedin_discovery
+    import scraper
+    sends=[]
+    class Gate:
+        def acquire(self,*args,**kwargs):
+            return linkedin_source_policy.ConsumedGrant("grant",datetime.now(timezone.utc))
+        def finish(self,*args,**kwargs):
+            pass
+    def send(adapter,request,**kwargs):
+        sends.append(request.url)
+        assert adapter.max_retries.total==0
+        response=requests.Response()
+        response.status_code=302
+        response.headers["Location"]="https://www.linkedin.com/checkpoint/challenge"
+        response.url=request.url
+        response.request=request
+        response._content=b""
+        return response
+    monkeypatch.setattr(requests.adapters.HTTPAdapter,"send",send)
+    attempts=[0]
+    with pytest.raises((linkedin_discovery.DiscoveryError,scraper.LinkedInRequestFailed)):
+        if kind=="search":
+            linkedin_discovery._request_page({"scope_key":"scope","query":"TPM","location":"Canada",
+                "job_type":"F","work_types":"1,2,3","source_window_earliest_at":"2026-11-20T00:00:00Z"},1,
+                user_agent="ua",gate=Gate(),parse_cards=lambda _:[],physical_attempts=attempts,physical_limit=10)
+        else:
+            scraper._fetch_linkedin_job_details("fixture",durable_gate=Gate(),physical_attempts=attempts,physical_limit=10)
+    assert len(sends)==attempts[0]==1

@@ -11,6 +11,18 @@ on:
         description: "Expected discovery sequence for the same cycle"
         required: true
         type: string
+      http_attempt_limit:
+        description: "Physical requests including retries; start with a 10-request canary"
+        required: true
+        default: '800'
+        type: choice
+        options: ['10', '50', '800']
+      runtime_seconds:
+        description: "Bounded execution time; the 300-task ceiling remains unchanged"
+        required: true
+        default: '1920'
+        type: choice
+        options: ['120', '600', '1920']
 
 concurrency:
   group: linkedin-freehire-pipeline
@@ -43,7 +55,7 @@ jobs:
           pip install -r requirements.txt
       - name: Configure private data API
         uses: ./.github/actions/configure-data-api
-      - name: Read-only identity and pending-work preflight
+      - name: Read-only identity and actionable-work preflight
         env: &drain_env
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -52,6 +64,8 @@ jobs:
           LINKEDIN_DISCOVERY_MODE: adaptive_queue
           LINKEDIN_DETAIL_ONLY_CYCLE_ID: ${{ inputs.cycle_id }}
           LINKEDIN_DETAIL_ONLY_SEQUENCE: ${{ inputs.discovery_sequence }}
+          LINKEDIN_DETAIL_ONLY_HTTP_LIMIT: ${{ inputs.http_attempt_limit }}
+          LINKEDIN_DETAIL_ONLY_RUNTIME_SECONDS: ${{ inputs.runtime_seconds }}
         run: python scripts/preflight_scraper_only.py
       - name: Drain one existing 300-task batch
         env: *drain_env

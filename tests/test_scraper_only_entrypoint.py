@@ -12,6 +12,7 @@ def test_original_entrypoint_drains_300_of_927_without_llm(monkeypatch, tmp_path
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_CYCLE_ID", "123")
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_SEQUENCE", "456")
     monkeypatch.setattr(discovery.supabase_utils, "supabase", PendingRead(927))
+    monkeypatch.setattr(discovery.supabase_utils, "linkedin_actionable_task_count", lambda: 927)
     configured = configuration()
     configured = configured.model_copy(update={"settings": configured.settings.model_copy(update={
         "options": {**configured.settings.options, "max_detail_tasks_per_run": task_limit,

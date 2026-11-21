@@ -147,10 +147,11 @@ def test_hourly_pipeline_has_separate_strictly_dependent_jobs_and_drains_compati
         "scrape",
         "freehire_compat",
         "publication_gate",
+        "gate_watchdog",
     ]
     assert jobs["freehire_compat"]["needs"] == "scrape"
     assert jobs["freehire_compat"]["if"] == (
-        "${{ inputs.archetype == '' || inputs.archetype == null }}"
+        "${{ always() && needs.scrape.result != 'cancelled' && (inputs.archetype == '' || inputs.archetype == null) }}"
     )
     assert jobs["publication_gate"]["needs"] == ["scrape", "freehire_compat"]
     assert jobs["freehire_compat"]["timeout-minutes"] == 45
@@ -189,7 +190,7 @@ def test_publication_gate_checks_results_and_production_contract():
 def test_source_pipeline_is_pull_only_and_ends_after_finalization():
     workflow = load_workflow("scrape_jobs.yml")
 
-    assert list(workflow["jobs"])[-1] == "publication_gate"
+    assert list(workflow["jobs"])[-1] == "gate_watchdog"
 
 
 def test_timezone_schedule_preserves_wall_clock_hours_across_dst():

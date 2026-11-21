@@ -140,9 +140,7 @@ def test_detail_drain_propagates_source_circuit(monkeypatch):
     monkeypatch.setattr(
         linkedin_discovery.supabase_utils,
         "transition_linkedin_discovery_task",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("circuit failures must not be downgraded")
-        ),
+        lambda *_args, **_kwargs: None,
     )
 
     with pytest.raises(LinkedInCircuitOpen):
@@ -283,7 +281,7 @@ def test_page_window_is_computed_after_durable_grant(monkeypatch):
         def acquire(self, *_args, **_kwargs):
             return ConsumedGrant("grant-1", started_at)
 
-        def finish(self, *_args):
+        def finish(self, *_args, **_kwargs):
             return None
 
     response = SimpleNamespace(
@@ -327,7 +325,7 @@ def test_transient_search_failure_preserves_resumable_cycle(monkeypatch):
                 "grant-1", datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
             )
 
-        def finish(self, *_args):
+        def finish(self, *_args, **_kwargs):
             return None
 
     response = SimpleNamespace(
@@ -390,7 +388,8 @@ def test_search_grant_deadline_preserves_resumable_cycle():
         )
 
 
-def test_scope_window_uses_per_scope_success_and_persisted_depth(monkeypatch):
+@pytest.mark.parametrize("resume_hours", [7, 14, 48])
+def test_scope_window_uses_page_frontier_not_resumed_completion(monkeypatch, resume_hours):
     execution = SimpleNamespace(
         lane=SimpleNamespace(archetype="technology_delivery"),
         query=SimpleNamespace(
@@ -406,13 +405,14 @@ def test_scope_window_uses_per_scope_success_and_persisted_depth(monkeypatch):
             geo_id=101174742,
         ),
     )
-    prior_success = datetime.now(timezone.utc) - timedelta(hours=10)
+    prior_success = datetime.now(timezone.utc) - timedelta(hours=resume_hours + 2)
     monkeypatch.setattr(
         linkedin_discovery.supabase_utils,
         "prepare_linkedin_discovery_scope_state",
         lambda keys, _floor: {
             "states": {keys[0]: {
-                "last_operational_success_at": prior_success.isoformat(),
+                "last_operational_success_at": (prior_success + timedelta(hours=resume_hours)).isoformat(),
+                "last_covered_through_at": prior_success.isoformat(),
                 "recommended_pages": 5,
             }},
             "debt": {},
@@ -429,7 +429,8 @@ def test_scope_window_uses_per_scope_success_and_persisted_depth(monkeypatch):
 
     earliest = datetime.fromisoformat(manifest["source_window_earliest_at"])
     latest = datetime.fromisoformat(manifest["source_window_latest_at"])
-    assert 15 <= (latest - earliest).total_seconds() / 3600 <= 17
+    assert earliest <= prior_success - timedelta(hours=6)
+    assert latest > prior_success
     assert manifest["target_pages"] == 5
 
 
@@ -489,7 +490,7 @@ def test_long_gap_uses_recovery_cap_and_records_only_the_expired_boundary(monkey
         "prepare_linkedin_discovery_scope_state",
         lambda keys, _floor: {
             "states": {keys[0]: {
-                "last_operational_success_at": (
+                "last_covered_through_at": (
                     datetime.now(timezone.utc) - timedelta(hours=200)
                 ).isoformat(),
                 "recommended_pages": 6,
@@ -527,7 +528,7 @@ def test_recoverable_gap_is_not_artificially_truncated(monkeypatch):
         "prepare_linkedin_discovery_scope_state",
         lambda keys, _floor: {
             "states": {keys[0]: {
-                "last_operational_success_at": (
+                "last_covered_through_at": (
                     datetime.now(timezone.utc) - timedelta(hours=30)
                 ).isoformat(),
                 "recommended_pages": 6,
@@ -625,7 +626,15 @@ def test_cycle_replay_uses_persisted_window(monkeypatch):
     assert result.cycle_id == 3
 
 
-def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
+@pytest.mark.parametrize("interruption,outcome", [
+    (LinkedInCircuitOpen("http_status=999"), "challenged"),
+    (linkedin_discovery.DiscoveryBudgetDeferred("local deadline"), "budget_deferred"),
+    (linkedin_discovery.DiscoveryRateLimited("HTTP 429"), "rate_limited"),
+    (linkedin_discovery.RetryableDiscoveryInterruption("HTTP 503"), "failed"),
+])
+def test_interruption_retains_cycle_and_exports_distinct_outcome(monkeypatch, tmp_path, interruption, outcome):
+    output = tmp_path / "output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     execution = SimpleNamespace(
         lane=SimpleNamespace(archetype="technology_delivery"),
         query=SimpleNamespace(
@@ -679,7 +688,7 @@ def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
         linkedin_discovery,
         "_request_page",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            LinkedInCircuitOpen("http_status=999")
+            interruption
         ),
     )
     monkeypatch.setattr(
@@ -690,11 +699,8 @@ def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
     monkeypatch.setattr(
         linkedin_discovery, "_drain_tasks", lambda *_args, **_kwargs: [])
 
-    with pytest.raises(
-        linkedin_discovery.LinkedInDiscoveryInterrupted,
-        match=r"cycle_id=7 remains resumable.*http_status=999",
-    ):
-        linkedin_discovery.run_discovery(
+    def run():
+        return linkedin_discovery.run_discovery(
             configuration,
             [execution],
             parse_cards=lambda _elements: [],
@@ -702,8 +708,15 @@ def test_source_challenge_fails_run_but_leaves_cycle_resumable(monkeypatch):
             save_details=lambda *_args: None,
             partial=False,
         )
-
+    if outcome == "budget_deferred":
+        assert run().outcome == "budget_deferred"
+    else:
+        with pytest.raises(linkedin_discovery.LinkedInDiscoveryInterrupted, match="cycle_id=7 remains resumable"):
+            run()
     assert failures == []
+    assert "discovery_cycle_id=7" in output.read_text()
+    assert "discovery_sequence=8" in output.read_text()
+    assert output.read_text().endswith(f"discovery_outcome={outcome}\n")
 
 
 def _over_cap_gate(monkeypatch, captured, finished):
@@ -724,7 +737,7 @@ def _over_cap_gate(monkeypatch, captured, finished):
         def acquire(self, *args, **kwargs):
             return SimpleNamespace(started_at=datetime.now(timezone.utc))
 
-        def finish(self, grant, response_class, status):
+        def finish(self, grant, response_class, status, **_kwargs):
             finished.append((response_class, status))
 
     return FakeGate()

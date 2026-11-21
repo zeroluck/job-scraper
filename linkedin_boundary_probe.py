@@ -13,10 +13,12 @@ import math
 import os
 from pathlib import Path
 import re
+import socket
 import time
 import types
 import unicodedata
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlencode, urlsplit, urlparse
 import requests
@@ -30,7 +32,7 @@ REVIEWED_DIAGNOSTIC_HORIZON_HOURS = 2400
 AUTHORIZATION = 'evidence-only-gate-writes-approved'
 GUEST = '/jobs-guest/jobs/api/seeMoreJobPostings/search'
 RPCS = {'get_scraper_configuration', 'acquire_linkedin_request_grant',
-        'consume_linkedin_request_grant', 'finish_linkedin_request_grant',
+        'consume_linkedin_request_grant', 'finish_linkedin_request_feedback',
         'open_linkedin_source_circuit'}
 INTERVALS = [
     ('2026-09-15T21:32:36.890075+00:00', '2026-09-17T23:18:37.539668+00:00'),
@@ -58,7 +60,7 @@ def originals():
     from collections.abc import Mapping, Sequence
     helpers = dict(globals(), Mapping=Mapping, Sequence=Sequence)
     names = ['_single_rpc_record', 'acquire_linkedin_request_grant',
-             'consume_linkedin_request_grant', 'finish_linkedin_request_grant',
+              'consume_linkedin_request_grant', 'finish_linkedin_request_feedback',
              'open_linkedin_source_circuit']
     selected('supabase_utils.py', names, helpers)
     ns['supabase_utils'] = types.SimpleNamespace(**{n: helpers[n] for n in names})

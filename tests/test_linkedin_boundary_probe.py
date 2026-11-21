@@ -36,7 +36,7 @@ def test_one_get_uses_real_gate_and_classifiers_at_http_boundary(probe, monkeypa
         assert name in probe.RPCS
         values = {'acquire_linkedin_request_grant': {'outcome': 'grant', 'grant_id': 'fixture-grant'},
                   'consume_linkedin_request_grant': {'consumed': True, 'started_at': '2026-11-05T00:00:00+00:00'},
-                  'finish_linkedin_request_grant': True}
+                  'finish_linkedin_request_feedback': True}
         return httpx.Response(200, json=values[name], request=request)
     monkeypatch.setattr(httpx.Client, 'send', data_send)
     def source_send(adapter, request, **kw):
@@ -61,7 +61,7 @@ def test_one_get_uses_real_gate_and_classifiers_at_http_boundary(probe, monkeypa
         gate = originals.DurableLinkedInRequestGate('source-boundary-evidence', db=db)
         target = __import__('json').loads((ROOT / 'recovery_parameters.json').read_text())[0]
         result = probe.capture(target, 'baseline', 240, gate, boundary, originals, tmp_path, 'original-agent')
-    assert events == ['acquire_linkedin_request_grant', 'consume_linkedin_request_grant', 'GET', 'finish_linkedin_request_grant']
+    assert events == ['acquire_linkedin_request_grant', 'consume_linkedin_request_grant', 'GET', 'finish_linkedin_request_feedback']
     assert result['raw_urn_ids'] == ['123']
     assert result['raw_link_ids'] == ['456']
     assert result['parsed_ids'] == ['123']
@@ -179,7 +179,7 @@ def test_full_runner_uses_all_config_then_12_exact_requests(probe, monkeypatch, 
         values = {'get_scraper_configuration': raw,
                   'acquire_linkedin_request_grant': {'outcome':'grant','grant_id':str(len(events))},
                   'consume_linkedin_request_grant': {'consumed':True,'started_at':'2026-11-05T00:00:00+00:00'},
-                  'finish_linkedin_request_grant':True}
+                  'finish_linkedin_request_feedback':True}
         return httpx.Response(200,json=values[name],request=request)
     def source_send(adapter,request,**kw):
         assert events[-1] == 'consume_linkedin_request_grant'

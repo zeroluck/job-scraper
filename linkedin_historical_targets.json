@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "as_of": "2026-11-21",
+  "parent_manifest": "recovery_parameters.json",
+  "parent_manifest_sha256": "ad9d74317a656e42b6a17120890bd1ecd20921060c98225c3cb6a63fe09e2b0c",
+  "target_identity": "period_id + ':' + parent.scope_key; Cartesian product of every period and all 13 original parent definitions",
+  "scope_period_targets": 78,
+  "expired_debt_rows_at_baseline": 65,
+  "publication_contract": "strict; no historical loss or debt acceptance authorized",
+  "periods": [
+    {"period_id":"H1","earliest_at":"2026-09-15T21:32:36.890075Z","latest_at":"2026-09-17T23:18:37.539668Z","outcome":"source_boundary","evidence":"cycle56; source-boundary Actions runs 42118269846,42120188175,42121589044"},
+    {"period_id":"H2","earliest_at":"2026-09-30T10:35:52.865851Z","latest_at":"2026-10-02T06:21:19.632152Z","outcome":"source_boundary","evidence":"cycle56; source-boundary Actions runs 42118269846,42120188175,42121589044"},
+    {"period_id":"H3","earliest_at":"2026-10-09T06:21:19.632152Z","latest_at":"2026-10-27T20:53:06.886095Z","outcome":"source_boundary","evidence":"cycle56; source-boundary Actions runs 42118269846,42120188175,42121589044"},
+    {"period_id":"N1","earliest_at":"2026-11-08T11:59:17.661667Z","latest_at":"2026-11-08T12:43:50.969727Z","outcome":"remaining_recoverable_work","evidence":"2026-11-21 interval-union audit; no containing completed search-window proof"},
+    {"period_id":"N2","earliest_at":"2026-11-10T07:27:22.220686Z","latest_at":"2026-11-10T14:27:53.256015Z","outcome":"remaining_recoverable_work","evidence":"cycles62/63 and 2026-11-21 interval-union audit"},
+    {"period_id":"N3","earliest_at":"2026-11-17T08:03:58.394253Z","latest_at":"2026-11-17T15:38:24.117137Z","outcome":"remaining_recoverable_work","evidence":"2026-11-21 interval-union audit; no containing completed search-window proof"}
+  ],
+  "common_source_boundary": "Guest search retained empty offset-250 pages since September 6. November 5 captures prove source-side emptiness, not historical inventory completeness. f_TPR is only a relative lower time bound. Neither work-mode facets nor DD sorting establish an exhaustive partition; no verified historical upper bound, archive, or export has been qualified.",
+  "next_qualification": "Keep original parent searches as controls. Demonstrate supported partition/filter semantics and incremental IDs before bounded enumeration. Every observed ID must use original durable observation, requirement, leased detail, and canonical-apply paths with parent/page provenance. Only qualified exact scope/window/page/canonical evidence can support explicit-ID expired-debt recovery.",
+  "enumeration_candidate": "Uncommitted work in job-scraper-history-recovery337 is evidence-only. Batches contain 416/416/520 units. August 7 anchor exceeds the frozen 100-day horizon; do not execute or move its anchor merely to evade the guard.",
+  "inventory_complete": false,
+  "debt_reconciliation_authorized": false
+}

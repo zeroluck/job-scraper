@@ -29,6 +29,7 @@ from linkedin_source_policy import (
     DurableLinkedInRequestGate,
     LinkedInCircuitOpen,
     LinkedInGrantRejected,
+    LinkedInRateLimited,
     is_linkedin_challenge,
 )
 
@@ -673,7 +674,6 @@ def _fetch_linkedin_job_details(
             if physical_attempts is not None:
                 if physical_limit is not None and physical_attempts[0] >= physical_limit:
                     raise LinkedInRequestFailed("LinkedIn detail physical-attempt budget exhausted")
-                physical_attempts[0] += 1
             if durable_gate is not None:
                 grant = durable_gate.acquire(
                     "detail", f"{request_key or job_id}:{retries}", deadline=deadline
@@ -683,7 +683,13 @@ def _fetch_linkedin_job_details(
                 request_timeout = min(
                     request_timeout, max(0.1, deadline - time.monotonic())
                 )
-            resp = requests.get(job_detail_url, headers=headers, timeout=request_timeout)
+            if physical_attempts is not None:
+                physical_attempts[0] += 1
+            resp = requests.get(job_detail_url, headers=headers, timeout=request_timeout, allow_redirects=False)
+            if 300 <= resp.status_code < 400:
+                if durable_gate is not None and grant is not None:
+                    durable_gate.finish(grant, "redirect", resp.status_code, response=resp)
+                raise LinkedInRequestFailed(f"LinkedIn detail redirect refused for job {job_id}")
             if is_linkedin_challenge(resp):
                 if durable_gate is not None and grant is not None:
                     durable_gate.open_circuit(
@@ -703,7 +709,7 @@ def _fetch_linkedin_job_details(
             status_code = e.response.status_code
             if status_code == 404 and retries < 1:
                 if durable_gate is not None and grant is not None:
-                    durable_gate.finish(grant, "not_found_unconfirmed", status_code)
+                    durable_gate.finish(grant, "not_found_unconfirmed", status_code, response=e.response)
                 retries += 1
                 if deadline is not None and time.monotonic() + config.RETRY_DELAY_SECONDS >= deadline:
                     raise LinkedInRequestFailed(
@@ -713,7 +719,7 @@ def _fetch_linkedin_job_details(
                 continue
             if status_code in (404, 410):
                 if durable_gate is not None and grant is not None:
-                    durable_gate.finish(grant, "terminal_unavailable", status_code)
+                    durable_gate.finish(grant, "terminal_unavailable", status_code, response=e.response)
                 logging.info(
                     "LinkedIn detail is no longer available for job ID %s (status=%s)",
                     job_id,
@@ -723,7 +729,9 @@ def _fetch_linkedin_job_details(
                     return LINKEDIN_DETAIL_UNAVAILABLE
                 return _LinkedInDetailUnavailable(status_code=410, confirmations=1)
             if durable_gate is not None and grant is not None:
-                durable_gate.finish(grant, "http_error", status_code)
+                durable_gate.finish(grant, "http_error", status_code, response=e.response)
+                if status_code == 429:
+                    raise LinkedInRateLimited(f"LinkedIn detail HTTP 429 for job {job_id}; yielding to shared cooldown") from e
             if status_code in (429, 500, 502, 503, 504) and retries < config.MAX_RETRIES:
                 retries += 1
                 wait_time = max(
@@ -878,7 +886,7 @@ def _fetch_linkedin_job_details(
                 + ", ".join(missing_fields)
             )
         if durable_gate is not None and grant is not None:
-            durable_gate.finish(grant, "complete", resp.status_code)
+            durable_gate.finish(grant, "complete", resp.status_code, response=resp)
         return job_details, detail_metadata
 
     except LinkedInGrantRejected:
@@ -1670,11 +1678,10 @@ def _run_database_configured_linkedin(
             config.ENABLE_REPOST_DEDUP = previous_repost_dedup
         saved_job_ids.extend(result.canonical_job_ids)
         os.environ["LINKEDIN_DISCOVERY_CYCLE_ID"] = str(result.cycle_id)
-        output_path = os.getenv("GITHUB_OUTPUT")
-        if output_path:
-            with open(output_path, "a", encoding="utf-8") as output:
-                output.write(f"discovery_cycle_id={result.cycle_id}\n")
-                output.write(f"discovery_sequence={result.discovery_sequence}\n")
+        if getattr(result, "outcome", "completed") == "rate_limited":
+            raise linkedin_discovery.LinkedInDiscoveryInterrupted(
+                f"LinkedIn details rate-limited; cycle_id={result.cycle_id}; shared cooldown persisted"
+            )
         return result.advance_watermark
 
     global _relist_detail_fetches_used

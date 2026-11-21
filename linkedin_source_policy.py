@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import time
+import math
+import os
+import socket
 from dataclasses import dataclass
 from datetime import datetime
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -19,6 +24,10 @@ class LinkedInGrantRejected(RuntimeError):
 
 
 class LinkedInRequestDeadlineExceeded(TimeoutError):
+    pass
+
+
+class LinkedInRateLimited(RuntimeError):
     pass
 
 
@@ -134,12 +143,45 @@ class DurableLinkedInRequestGate:
                 started_at=datetime.fromisoformat(started_at.replace("Z", "+00:00")),
             )
 
-    def finish(self, grant: ConsumedGrant, response_class: str, http_status: int | None) -> None:
-        finished = supabase_utils.finish_linkedin_request_grant(
+    def finish(
+        self, grant: ConsumedGrant, response_class: str, http_status: int | None,
+        *, response: Any = None,
+    ) -> None:
+        headers = getattr(response, "headers", {}) or {}
+        retained = {
+            name.lower(): str(headers[name])[:512]
+            for name in ("Retry-After", "Date", "Server", "X-Li-UUID", "X-Li-Fabric")
+            if name in headers
+        }
+        retry_after = None
+        raw = headers.get("Retry-After")
+        if raw is not None:
+            try:
+                seconds = float(raw)
+            except (ValueError, TypeError):
+                try:
+                    retry_at = parsedate_to_datetime(raw)
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=timezone.utc)
+                    seconds = (retry_at - datetime.now(timezone.utc)).total_seconds()
+                except (ValueError, TypeError, OverflowError):
+                    seconds = 0
+            if math.isfinite(seconds):
+                retry_after = min(604800, max(0, math.ceil(seconds)))
+        finished = supabase_utils.finish_linkedin_request_feedback(
             grant.grant_id,
             self.producer,
             response_class,
             http_status,
+            retry_after_seconds=retry_after,
+            response_headers=retained,
+            execution_metadata={
+                "run_id": os.getenv("GITHUB_RUN_ID"),
+                "run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
+                "sha": os.getenv("GITHUB_SHA"),
+                "runner": os.getenv("RUNNER_NAME") or socket.gethostname(),
+                "cycle_id": os.getenv("LINKEDIN_DISCOVERY_CYCLE_ID"),
+            },
             db=self.db,
         )
         if not finished:

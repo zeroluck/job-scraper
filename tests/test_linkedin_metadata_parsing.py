@@ -89,7 +89,7 @@ def test_fetch_linkedin_details_uses_durable_gate_without_legacy_limiter(monkeyp
             events.append(("acquire", kind, key))
             return ConsumedGrant("grant-1", datetime.now(timezone.utc))
 
-        def finish(self, grant, response_class, status):
+        def finish(self, grant, response_class, status, **_kwargs):
             events.append(("finish", grant.grant_id, response_class, status))
 
     monkeypatch.setattr(scraper.requests, "get", lambda *_args, **_kwargs: Response())

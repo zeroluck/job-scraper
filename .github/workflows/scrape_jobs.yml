@@ -46,6 +46,7 @@ jobs:
     outputs:
       discovery_cycle_id: ${{ steps.scraper.outputs.discovery_cycle_id }}
       discovery_sequence: ${{ steps.scraper.outputs.discovery_sequence }}
+      discovery_outcome: ${{ steps.scraper.outputs.discovery_outcome }}
     steps:
       - name: Checkout repository code
         uses: actions/checkout@v4
@@ -93,7 +94,7 @@ jobs:
       JOB_DATA_API_URL: https://pgsql.jdb.l.cd
       JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
       JOB_STORAGE_BACKEND: supabase
-    if: ${{ inputs.archetype == '' || inputs.archetype == null }}
+    if: ${{ always() && needs.scrape.result != 'cancelled' && (inputs.archetype == '' || inputs.archetype == null) }}
     needs: scrape
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -164,20 +165,34 @@ jobs:
           --discovery-cycle-id "${{ needs.scrape.outputs.discovery_cycle_id }}"
 
   gate_watchdog:
-    # Warn, don't discard: a deferred gate freezes the watermark and every
-    # later run is a no-op until a human reviews the blocking tasks. File (or
-    # refresh) a tracking issue so the stall pages a person instead of only
-    # appearing in hourly logs nobody reads. Closes itself once publishing
-    # resumes. The failing requirement rows stay untouched in the database;
-    # unblocking remains a reviewed accept_linkedin_discovery_requirement call.
+    env:
+      JOB_DATA_API_URL: https://pgsql.jdb.l.cd
+      JOB_DATA_API_TOKEN: ${{ secrets.JOB_DATA_API_TOKEN }}
+      JOB_STORAGE_BACKEND: supabase
+    # Ingestion and classification may progress while strict publication stalls.
+    # Report the actual first barrier and exact counts, with capped examples.
     if: ${{ always() && (inputs.archetype == '' || inputs.archetype == null) }}
     needs: [publication_gate]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: read
       contents: read
       issues: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install read-only health dependencies
+        run: pip install python-dotenv supabase certifi
+      - name: Configure private data API
+        uses: ./.github/actions/configure-data-api
+      - name: Measure dispatch, coverage, classification and publication ages
+        id: health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/linkedin_health.py
       - name: File or refresh gate-stall issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -186,23 +201,24 @@ jobs:
           GATE_CYCLE_ID: ${{ needs.publication_gate.outputs.requested_cycle_id }}
           GATE_BLOCKING_DETAILS: ${{ needs.publication_gate.outputs.blocking_details }}
           GATE_GENERATION: ${{ needs.publication_gate.outputs.generation }}
+          HEALTH_ALERTS: ${{ steps.health.outputs.alerts }}
         run: |
           if [ -z "$GATE_OUTCOME" ]; then
-            echo "Gate did not report an outcome; watchdog idle."
-            exit 0
+            GATE_OUTCOME=unreported
           fi
           gh label create pipeline-gate \
             --repo "${{ github.repository }}" \
-            --description "Deferred publication gate blocking ingestion watermark" \
+            --description "Strict publication stalled; ingestion health reported separately" \
             --color B60205 2>/dev/null || true
           OPEN_ISSUE=$(gh issue list --repo "${{ github.repository }}" --label pipeline-gate --state open --json number --jq '.[0].number // empty')
           RUN_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ "$GATE_OUTCOME" = "deferred" ] && [ "${GATE_BLOCKING_COUNT:-1}" != "0" ]; then
+          if { [ "$GATE_OUTCOME" = "deferred" ] && [ "${GATE_BLOCKING_COUNT:-1}" != "0" ]; } || [ -n "$HEALTH_ALERTS" ] || [ "$GATE_OUTCOME" = "unreported" ]; then
             BODY="Publication gate deferred on run <$RUN_LINK>."
             BODY="$BODY Cycle: \`$GATE_CYCLE_ID\`. Blocking: \`$GATE_BLOCKING_COUNT\`."
             BODY="$BODY Details: \`$GATE_BLOCKING_DETAILS\`."
-            BODY="$BODY The watermark is frozen; hourly runs are no-ops until the blocking requirements are reviewed."
-            BODY="$BODY Unblock with a reviewed accept_linkedin_discovery_requirement call (see the gate step summary for the exact statement)."
+            BODY="$BODY Health alerts: \`$HEALTH_ALERTS\`. Gate outcome: \`$GATE_OUTCOME\`."
+            BODY="$BODY Strict publication is deferred; ingestion and classification can still progress."
+            BODY="$BODY Drain eligible work through guarded workers. Historical predecessors/debt require provenance-backed recovery; any acceptance requires a separate explicit decision."
             if [ -z "$OPEN_ISSUE" ]; then
               gh issue create --repo "${{ github.repository }}" --label pipeline-gate \
                 --title "Publication gate deferred: cycle $GATE_CYCLE_ID blocked" \

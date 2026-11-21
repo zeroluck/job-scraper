@@ -35,7 +35,7 @@ def test_interactive_full_native_runner_preserves_scope_and_exposes_overlap(
         values = {'get_scraper_configuration': native_config,
                   'acquire_linkedin_request_grant': {'outcome': 'grant', 'grant_id': str(len(events))},
                   'consume_linkedin_request_grant': {'consumed': True, 'started_at': '2026-11-05T22:00:00+00:00'},
-                  'finish_linkedin_request_grant': True}
+                  'finish_linkedin_request_feedback': True}
         return httpx.Response(200, json=values[name], request=request)
     def source_send(adapter, request, **kw):
         assert events[-1] == 'consume_linkedin_request_grant'
@@ -95,7 +95,7 @@ def test_interactive_stops_without_retry_and_preserves_exact_accounting(probe, m
         name = request.url.path.rsplit('/', 1)[-1]; events.append(name)
         values = {'acquire_linkedin_request_grant': {'outcome': 'circuit_open'} if stop == 'gate' else {'outcome': 'grant', 'grant_id': 'g'},
                   'consume_linkedin_request_grant': {'consumed': True, 'started_at': '2026-11-05T22:00:00+00:00'},
-                  'finish_linkedin_request_grant': True}
+                  'finish_linkedin_request_feedback': True}
         return httpx.Response(200, json=values[name], request=request)
     def send(adapter, request, **kw):
         events.append('GET')
@@ -113,7 +113,7 @@ def test_interactive_stops_without_retry_and_preserves_exact_accounting(probe, m
             probe.capture(target, 'interactive', 60, gate, boundary, original, tmp_path, 'ua')
         assert boundary.attempts == (1 if stop in ('transport', 'crash') else 0)
     if stop in ('transport', 'crash'):
-        assert events == ['acquire_linkedin_request_grant', 'consume_linkedin_request_grant', 'GET', 'finish_linkedin_request_grant']
+        assert events == ['acquire_linkedin_request_grant', 'consume_linkedin_request_grant', 'GET', 'finish_linkedin_request_feedback']
         r = json.loads((tmp_path / '00-interactive-60.json').read_text())
         assert r['classifier'] == ('transport_error' if stop == 'transport' else 'probe_error')
         assert r['query_params']['start'] == 60
@@ -165,7 +165,6 @@ def test_selected_mode_keeps_recipient_encryption_roundtrip(probe, tmp_path):
             assert tar.extractfile('linkedin-boundary-evidence/summary.json').read() == (evidence / 'summary.json').read_bytes()
     finally:
         key.unlink(missing_ok=True)
-
 
 
 

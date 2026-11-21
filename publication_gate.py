@@ -1,6 +1,7 @@
 """Verify pipeline results and finalize an immutable publication generation."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -10,13 +11,7 @@ import config
 PIPELINE_JOBS = ("scrape", "freehire_compat")
 PUBLICATION_SCHEMA_VERSION = "freehire-publication-v1"
 
-#: Table-driven alerting for deferred publication gates. A deferred gate with
-#: blocking requirements means the watermark is frozen and no new discovery
-#: cycles are created, so every subsequent hourly run is a no-op until a
-#: human reviews the blocking tasks. These helpers surface that state as a
-#: workflow warning, a step summary, and job outputs consumed by the
-#: gate_watchdog workflow job (auto-filed GitHub issue). Alerting never
-#: fails the gate itself.
+# Ingestion can progress while strict historical publication remains blocked.
 GATE_WATCHDOG_ISSUE_LABEL = "pipeline-gate"
 MAX_BLOCKING_DETAILS = 10
 
@@ -237,84 +232,23 @@ def write_github_outputs(state: dict[str, int | str | None], output_path: str | 
 
 
 def query_blocking_requirements(db, discovery_cycle_id: int) -> list[dict]:
-    """Return unaccepted blocking requirement details for a deferred cycle.
+    """Return capped examples, never a backlog count."""
+    return query_publication_diagnostics(db, discovery_cycle_id)["task_examples"]
 
-    Each entry keeps the requirement filed as failing (status, attempts, and
-    error code are reported, never mutated): task_id, provider,
-    source_job_id, task_kind, requirement_key, status, attempt_count,
-    max_attempts, last_error_code, and latest_observed_at.
-    """
-    req_response = (
-        db.table("linkedin_discovery_requirements")
-        .select("discovery_cycle_id,ingestion_run_id,provider,source_job_id,task_kind,requirement_key,task_id")
-        .eq("discovery_cycle_id", discovery_cycle_id)
-        .eq("required", True)
-        .execute()
-    )
-    requirements = req_response.data or []
-    if not requirements:
-        return []
-    acc_response = (
-        db.table("linkedin_discovery_requirement_acceptances")
-        .select("discovery_cycle_id,ingestion_run_id,provider,source_job_id,task_kind,requirement_key")
-        .eq("discovery_cycle_id", discovery_cycle_id)
-        .execute()
-    )
-    accepted = {
-        (
-            row.get("ingestion_run_id"),
-            row.get("provider"),
-            row.get("source_job_id"),
-            row.get("task_kind"),
-            row.get("requirement_key"),
-        )
-        for row in (acc_response.data or [])
-    }
-    blocking = []
-    for req in requirements:
-        key = (
-            req.get("ingestion_run_id"),
-            req.get("provider"),
-            req.get("source_job_id"),
-            req.get("task_kind"),
-            req.get("requirement_key"),
-        )
-        if key in accepted:
-            continue
-        task_response = (
-            db.table("linkedin_discovery_tasks")
-            .select("id,status,attempt_count,max_attempts,last_error_code,latest_observed_at")
-            .eq("id", req.get("task_id"))
-            .limit(1)
-            .execute()
-        )
-        task_rows = task_response.data or []
-        task = task_rows[0] if task_rows else {}
-        if task.get("status") in ("complete", "terminal_unavailable"):
-            continue
-        blocking.append({
-            "task_id": req.get("task_id"),
-            "provider": req.get("provider"),
-            "source_job_id": req.get("source_job_id"),
-            "task_kind": req.get("task_kind"),
-            "requirement_key": req.get("requirement_key"),
-            "ingestion_run_id": req.get("ingestion_run_id"),
-            "status": task.get("status"),
-            "attempt_count": task.get("attempt_count"),
-            "max_attempts": task.get("max_attempts"),
-            "last_error_code": task.get("last_error_code"),
-            "latest_observed_at": task.get("latest_observed_at"),
-        })
-        if len(blocking) >= MAX_BLOCKING_DETAILS:
-            break
-    return blocking
+
+def query_publication_diagnostics(db, discovery_cycle_id: int | None) -> dict:
+    response = db.rpc("linkedin_publication_diagnostics", {"p_cycle_id": discovery_cycle_id}).execute()
+    value = response.data
+    if not isinstance(value, dict) or not {"predecessor_ids", "coverage_debt_count", "requirement_count", "distinct_task_count", "publication", "task_examples"}.issubset(value):
+        raise RuntimeError("Publication diagnostics returned an incomplete response")
+    return value
 
 
 def format_blocking_warning(discovery_cycle_id: int, blocking: list[dict]) -> str:
     first = blocking[0]
     return (
         f"Publication gate deferred: cycle {discovery_cycle_id} blocked by "
-        f"{len(blocking)} unaccepted requirement(s); first task={first.get('task_id')} "
+        f"sample of {len(blocking)} unaccepted requirement(s); first task={first.get('task_id')} "
         f"status={first.get('status')} error={first.get('last_error_code')} "
         f"{first.get('provider')}:{first.get('source_job_id')}"
     )
@@ -326,7 +260,7 @@ def format_blocking_summary(discovery_cycle_id: int, reason: str | None, blockin
         "",
         f"- requested cycle: `{discovery_cycle_id}`",
         f"- reason: {reason or 'publication deferred'}",
-        f"- unaccepted blocking requirements: {len(blocking)}",
+        f"- capped requirement examples: {len(blocking)} (not an exact count)",
         "",
         "| task | source | status | attempts | error | last observed |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -341,15 +275,8 @@ def format_blocking_summary(discovery_cycle_id: int, reason: str | None, blockin
         )
     lines += [
         "",
-        "Unblock with a reviewed acceptance (records reviewer + reason, keeps the",
-        "failing task row intact):",
-        "",
-        "```sql",
-        "SELECT public.accept_linkedin_discovery_requirement(",
-        f"  {discovery_cycle_id}, '<ingestion_run_id>', '<provider>',",
-        "  '<source_job_id>', '<task_kind>', '<requirement_key>',",
-        "  '<reviewer>', '<reason>');",
-        "```",
+        "Drain eligible pending/retryable work through the guarded worker; investigate source denials and durable failures.",
+        "Historical predecessor/debt barriers require provenance-backed recovery. Acceptance is a separate reviewed decision.",
     ]
     return "\n".join(lines)
 
@@ -371,22 +298,21 @@ def emit_deferral_warning(db, state: dict[str, int | str | None]) -> str:
         cycle_id = state.get("requested_cycle_id")
         if state.get("outcome") != "deferred" or not cycle_id:
             return ""
-        blocking = query_blocking_requirements(db, int(cycle_id))
-        if not blocking:
-            return ""
-        warning = format_blocking_warning(int(cycle_id), blocking)
+        diagnostic = query_publication_diagnostics(db, int(cycle_id))
+        blocking = diagnostic["task_examples"]
+        warning = (
+            f"Publication gate deferred: cycle {cycle_id} blocked; reason={state.get('reason')}; "
+            f"predecessors={diagnostic['predecessor_ids']}; coverage_debt={diagnostic['coverage_debt_count']}; "
+            f"requirements={diagnostic['requirement_count']}; distinct_tasks={diagnostic['distinct_task_count']}; "
+            f"sample_size={len(blocking)}"
+        )
         print(f"::warning::{warning}")
         append_github_summary(
-            format_blocking_summary(int(cycle_id), state.get("reason"), blocking),
+            format_blocking_summary(int(cycle_id), state.get("reason"), blocking)
+            + "\n\nExact state: `" + json.dumps({k:v for k,v in diagnostic.items() if k!="task_examples"}, separators=(",", ":")) + "`",
             os.getenv("GITHUB_STEP_SUMMARY"),
         )
-        first = blocking[0]
-        return (
-            f"task={first.get('task_id')} status={first.get('status')} "
-            f"error={first.get('last_error_code')} "
-            f"{first.get('provider')}:{first.get('source_job_id')} "
-            f"({len(blocking)} blocking)"
-        )
+        return warning
     except Exception as exc:
         print(f"Gate deferral warning unavailable: {exc}")
         return ""
@@ -404,12 +330,16 @@ def main() -> None:
         "scrape": args.scrape_result,
         "freehire_compat": args.freehire_compat_result,
     }
-    verify_pipeline_results(results)
+    pipeline_error = None
+    try:
+        verify_pipeline_results(results)
+    except RuntimeError as exc:
+        pipeline_error = exc
     try:
         discovery_cycle_id = int(args.discovery_cycle_id)
     except (TypeError, ValueError):
         discovery_cycle_id = None
-    if not discovery_cycle_id or discovery_cycle_id <= 0:
+    if (not discovery_cycle_id or discovery_cycle_id <= 0) and not pipeline_error:
         raise RuntimeError(
             "Publication gate blocked: no discovery cycle ID from scrape "
             f"(scrape={results['scrape']}, freehire_compat={results['freehire_compat']})"
@@ -417,7 +347,18 @@ def main() -> None:
     db = _get_db()
     state = query_publication_state(db)
     validate_publication_state(state, require_legacy_ready=False)
-    state.update(finalize_publication(db, state, discovery_cycle_id))
+    diagnostic = query_publication_diagnostics(db, discovery_cycle_id)
+    if pipeline_error:
+        state.update({"outcome":"deferred", "reason":str(pipeline_error),
+                      "requested_cycle_id":discovery_cycle_id or diagnostic["requested_cycle_id"],
+                      "eligible_cycle_id":None, "blocking_count":len(diagnostic["predecessor_ids"]) or diagnostic["coverage_debt_count"] or diagnostic["requirement_count"]})
+    else:
+        state.update(finalize_publication(db, state, discovery_cycle_id))
+    if state["outcome"] == "deferred":
+        state.update({key: (diagnostic["publication"] or {}).get(key) for key in
+                      ("generation", "published_at", "row_count", "schema_version", "source_scrape_watermark")})
+    state.update({key:diagnostic.get(key) for key in ("covered_through_at", "requirement_count", "distinct_task_count", "actionable_tasks", "leased_tasks", "coverage_debt_count")})
+    state["predecessor_ids"] = json.dumps(diagnostic["predecessor_ids"], separators=(",", ":"))
     pruned_generations = (
         try_prune_publication_generations(db)
         if state["outcome"] in {"published", "unchanged"}
@@ -428,7 +369,7 @@ def main() -> None:
         "Publication state: "
         f"total={state['total']} current={state['current']} pending={state['pending']} "
         f"failed={state['failed']} processing={state['processing']} stale={state['stale']} "
-        f"published={state['published']} prior_publication={state['prior_publication']} "
+        f"current_view_rows={state['published']} prior_classifications={state['prior_publication']} "
         f"scrape_watermark={state['scrape_watermark'] or 'unavailable'} "
         f"outcome={state['outcome']} reason={state['reason'] or 'none'} "
         f"requested_cycle_id={state['requested_cycle_id']} "
@@ -440,6 +381,8 @@ def main() -> None:
         f"pruned_generations={pruned_generations}"
     )
     write_github_outputs(state, os.getenv("GITHUB_OUTPUT"))
+    if pipeline_error:
+        raise pipeline_error
 
 
 if __name__ == "__main__":

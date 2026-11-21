@@ -35,7 +35,7 @@ def test_full_native_facet_runner_binds_wire_grants_and_parent(probe, native_con
         values = {'get_scraper_configuration': native_config,
                   'acquire_linkedin_request_grant': {'outcome': 'grant', 'grant_id': str(len(events))},
                   'consume_linkedin_request_grant': {'consumed': True, 'started_at': '2026-11-05T22:00:00+00:00'},
-                  'finish_linkedin_request_grant': True}
+                  'finish_linkedin_request_feedback': True}
         return httpx.Response(200, json=values[name], request=request)
     def source_send(session, request, **kw):
         assert events[-1] == 'consume_linkedin_request_grant'
@@ -100,4 +100,3 @@ def test_workflow_and_cli_accept_only_reviewed_mode(probe, monkeypatch):
     assert mode['options'] == ['boundary','interactive-pagination','work-mode-facets']
     help_text = subprocess.run([sys.executable, str(ROOT / 'linkedin_boundary_probe.py'), '--help'],capture_output=True,text=True,check=True).stdout
     assert 'work-mode-facets' in help_text
-

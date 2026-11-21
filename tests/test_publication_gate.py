@@ -328,6 +328,16 @@ class BlockingDb:
         self.acceptances = acceptances
         self.tasks = tasks
 
+    def rpc(self, name, args):
+        assert name == "linkedin_publication_diagnostics"
+        assert args == {"p_cycle_id": 49}
+        # Database join/count behavior is exercised on the native-role fixture.
+        diagnostic = {"predecessor_ids":[50,51], "coverage_debt_count":65,
+                      "requirement_count":1184, "distinct_task_count":714,
+                      "publication":{"generation":71,"row_count":23745},
+                      "task_examples":[{**self.requirements[0], **self.tasks[0]}]}
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=diagnostic))
+
     def table(self, name):
         return BlockingTable({
             "linkedin_discovery_requirements": self.requirements,
@@ -426,12 +436,14 @@ def test_deferral_warning_is_single_line_and_summarized(tmp_path, capsys, monkey
     details = publication_gate.emit_deferral_warning(_blocking_fixture(), state)
 
     assert "\n" not in details and "\r" not in details
-    assert "66534" in details and "detail_invalid" in details
+    assert "predecessors=[50, 51]" in details and "requirements=1184" in details
+    assert "distinct_tasks=714" in details and "sample_size=1" in details
     out = capsys.readouterr().out
     assert out.startswith("::warning::Publication gate deferred: cycle 49 blocked")
     summary_text = summary.read_text()
     assert "## Publication gate deferred" in summary_text
-    assert "accept_linkedin_discovery_requirement" in summary_text
+    assert "provenance-backed recovery" in summary_text
+    assert "accept_linkedin_discovery_requirement" not in summary_text
 
 
 def test_deferral_warning_idle_without_deferred_blocking(capsys):
@@ -445,7 +457,7 @@ def test_deferral_warning_idle_without_deferred_blocking(capsys):
 
 def test_deferral_warning_never_fails_the_gate(capsys):
     class BrokenDb:
-        def table(self, _name):
+        def rpc(self, *_args):
             raise RuntimeError("db down")
 
     assert publication_gate.emit_deferral_warning(BrokenDb(), {"outcome": "deferred", "requested_cycle_id": 49}) == ""

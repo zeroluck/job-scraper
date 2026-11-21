@@ -2,6 +2,21 @@
   "project_ref": "lcygogvpedfwzlzvlysa",
   "last_verified": "2026-10-10",
   "history_hash": "fef6e0284568b11286664983766fc154",
+  "native_authority": {
+    "data_api": "https://pgsql.jdb.l.cd",
+    "database": "jobs",
+    "database_oid": 299919,
+    "system_identifier": "7701229561420400865",
+    "note": "applied/history_hash below retain the last hosted ledger; CT337 has no migration-history table. Native applications require separate identity-guarded receipts, never invented hosted stamps."
+  },
+  "native_applied": [
+    {
+      "name": "linkedin_ingestion_remediation",
+      "at": "2026-11-21T20:11:38Z",
+      "receipt": "linkedin-remediation-deploy-20261121T201138Z.json",
+      "verification": "Identity/function/state-guarded atomic application; actual job_runner diagnostics returned cycle70,714 actionable,1184 requirements,65 debt,generation71."
+    }
+  ],
   "applied": [
     {
       "version": "20260822094616",
@@ -453,6 +468,17 @@
     }
   ],
   "owned": {
+    "linkedin_ingestion_remediation": {
+      "files": [
+        "job-scraper:supabase_setup/reconcile_linkedin_actionable_selector.sql",
+        "job-scraper:supabase_setup/repair_linkedin_continuation.sql",
+        "job-scraper:supabase_setup/repair_linkedin_retry_accounting.sql",
+        "job-scraper:supabase_setup/linkedin_durable_throttling.sql",
+        "job-scraper:supabase_setup/linkedin_publication_diagnostics.sql",
+        "web:supabase/migrations/20261121195836_linkedin_ingestion_remediation.sql"
+      ],
+      "note": "Five authoritative incremental forwards, concatenated in this order in the web history mirror. Selector reconciles the already-installed November 3 native change; other changes require qualified native application receipts. Not a hosted application claim."
+    },
     "job_data_surface_rpcs": {
       "files": [
         "web:supabase/migrations/202606140001_job_data_surface_rpcs.sql"

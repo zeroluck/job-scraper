@@ -103,7 +103,7 @@ def test_original_anchor_at_nov5_accepts_full_native_replay_without_narrowing(pr
         values = {'get_scraper_configuration': native_config,
                   'acquire_linkedin_request_grant': {'outcome': 'grant', 'grant_id': str(len(events))},
                   'consume_linkedin_request_grant': {'consumed': True, 'started_at': started_at.isoformat()},
-                  'finish_linkedin_request_grant': True}
+                  'finish_linkedin_request_feedback': True}
         value = values[name]
         if singleton_rpc_envelopes and isinstance(value, dict):
             value = [value]

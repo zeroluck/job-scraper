@@ -41,34 +41,32 @@ class PendingRead:
     ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "running"}, 300, False, 927, "identity"),
     ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"}, 301, False, 927, "300-task"),
     ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"}, 300, True, 927, "identity"),
-    ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"}, 300, False, 0, "pending"),
-    ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"}, 300, False, None, "pending"),
+    ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"}, 300, False, 0, "actionable"),
+    ({"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"}, 300, False, None, "actionable"),
 ])
 def test_guard_fail_closed(monkeypatch, cycle, limit, partial, count, error):
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_CYCLE_ID", "7")
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_SEQUENCE", "9")
     db = PendingRead(count)
     monkeypatch.setattr(discovery.supabase_utils, "supabase", db)
+    monkeypatch.setattr(discovery.supabase_utils, "linkedin_actionable_task_count", lambda: count)
     with pytest.raises(discovery.DiscoveryError, match=error):
         discovery.require_detail_only_cycle(cycle, {"detail": limit}, partial=partial)
-    if error != "pending":
+    if error != "actionable":
         assert db.calls == []
 
 
-def test_guard_accepts_exact_identity_and_pending_read_only(monkeypatch):
+def test_guard_accepts_retry_only_actionable_work(monkeypatch):
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_CYCLE_ID", "7")
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_SEQUENCE", "9")
     db = PendingRead(927)
     monkeypatch.setattr(discovery.supabase_utils, "supabase", db)
+    monkeypatch.setattr(discovery.supabase_utils, "linkedin_actionable_task_count", lambda: 11)
     discovery.require_detail_only_cycle(
         {"cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"},
         {"detail": 300}, partial=False,
     )
-    assert db.calls == [
-        ("table", "linkedin_discovery_tasks"),
-        ("select", ("id",), {"count": "exact", "head": True}),
-        ("eq", ("status", "pending")),
-    ]
+    assert db.calls == []
 
 
 def test_real_discovery_guard_stops_before_new_cycle(monkeypatch):
@@ -108,12 +106,13 @@ def test_preflight_uses_same_guard_and_db_configuration(monkeypatch):
     monkeypatch.setattr(preflight.config, "SCRAPING_SOURCES", ["linkedin"])
     db = PendingRead(927)
     monkeypatch.setattr(preflight.supabase_utils, "supabase", db)
+    monkeypatch.setattr(preflight.supabase_utils, "linkedin_actionable_task_count", lambda: 11)
     monkeypatch.setattr(preflight, "load_scrape_configuration", lambda **kw: SimpleNamespace(
         settings=SimpleNamespace(options={"max_detail_tasks_per_run": 300}, max_pages_per_query=3, max_jobs_per_query=50)))
     monkeypatch.setattr(preflight.supabase_utils, "get_resumable_linkedin_discovery_cycle", lambda **kw: {
         "cycle_id": 7, "discovery_sequence": 9, "search_status": "sealed"})
     preflight.main()
-    assert db.calls[-1] == ("eq", ("status", "pending"))
+    assert db.calls == []
     monkeypatch.setenv("SCRAPE_ARCHETYPE", "unexpected")
     with pytest.raises(SystemExit, match="environment"):
         preflight.main()
