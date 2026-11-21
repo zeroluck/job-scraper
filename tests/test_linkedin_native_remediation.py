@@ -107,11 +107,14 @@ VALUES ('fixture','first','00000000-0000-0000-0000-000000000001','{}',now(),now(
         assert grant["consumed"] is True
         assert native("SELECT attempt_count FROM public.linkedin_discovery_tasks",role="job_runner").stdout.strip()=="1"
         assert native(f"SELECT public.finish_linkedin_request_grant('{grant['grant_id']}','adaptive-detail','http_error',503)",role="job_runner").stdout.strip()=="t"
-    native("UPDATE public.linkedin_discovery_tasks SET lease_expires_at=now()-interval '1 second'")
-    denied=native(f"SELECT public.acquire_linkedin_request_grant('adaptive-detail','detail','{prefix}:2')",role="job_runner",check=False)
-    # Spacing can defer the invalid lease before lease validation; once ready it must reject.
     native("UPDATE public.linkedin_source_request_policy SET next_allowed_at=now()")
-    denied=native(f"SELECT public.acquire_linkedin_request_grant('adaptive-detail','detail','{prefix}:2')",role="job_runner",check=False)
+    grant=json.loads(native(f"SELECT public.acquire_linkedin_request_grant('adaptive-detail','detail','{prefix}:2')",role="job_runner").stdout)
+    native(f"SELECT public.finish_linkedin_request_grant('{grant['grant_id']}','adaptive-detail','terminal_unavailable',410)",role="job_runner")
+    native(f"SELECT public.transition_linkedin_discovery_task({task['id']},'worker','{task['lease_token']}','terminal_unavailable',NULL,'source_unavailable_410')",role="job_runner")
+    assert native("SELECT public.linkedin_actionable_task_count()",role="job_runner").stdout.strip()=="0"
+    assert native("SELECT count(*) FROM public.linkedin_discovery_tasks WHERE status='leased'",role="job_runner").stdout.strip()=="0"
+    native("UPDATE public.linkedin_source_request_policy SET next_allowed_at=now()")
+    denied=native(f"SELECT public.acquire_linkedin_request_grant('adaptive-detail','detail','{prefix}:3')",role="job_runner",check=False)
     assert denied.returncode and 'active task lease' in denied.stderr
 
 

@@ -92,6 +92,14 @@ jobs:
             true|false) ;;
             *) echo "Invalid FREEHIRE_APPLY: $FREEHIRE_APPLY" >&2; exit 2 ;;
           esac
+          case "$FREEHIRE_CLASSIFY_REQUEST_BUDGET" in
+            1|4|10|40) ;;
+            *) echo "Invalid physical provider request budget" >&2; exit 2 ;;
+          esac
+          case "$FREEHIRE_CLASSIFY_MAX_DURABLE_ATTEMPTS" in
+            6|10) ;;
+            *) echo "Invalid durable eligibility cap" >&2; exit 2 ;;
+          esac
           args=(--limit "$FREEHIRE_CLASSIFY_LIMIT")
           if [[ "$FREEHIRE_APPLY" == "true" ]]; then args+=(--apply); fi
           if [[ "$FREEHIRE_DRAIN_BACKLOG" == "true" ]]; then args+=(--drain-backlog); fi

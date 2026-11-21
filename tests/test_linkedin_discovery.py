@@ -123,6 +123,26 @@ def test_detail_drain_delegates_atomic_task_application(monkeypatch):
     assert transitions == []
 
 
+def test_cooldown_wait_yields_before_live_task_lease_expires(monkeypatch):
+    task={"id":7,"source_job_id":"source-1","lease_token":"lease",
+          "lease_expires_at":(datetime.now(timezone.utc)+timedelta(seconds=120)).isoformat()}
+    claims=[]
+    transitions=[]
+    monkeypatch.setattr(linkedin_discovery.time,"monotonic",lambda:1000)
+    monkeypatch.setattr(linkedin_discovery.supabase_utils,"claim_linkedin_discovery_tasks",
+        lambda *args,**kwargs: claims.append(1) or [task])
+    monkeypatch.setattr(linkedin_discovery.supabase_utils,"transition_linkedin_discovery_task",
+        lambda *args,**kwargs: transitions.append((args,kwargs)))
+    def refuse(*args,**kwargs):
+        assert kwargs["physical_attempts"]==[0]
+        assert 1118-linkedin_discovery.config.REQUEST_TIMEOUT <= kwargs["deadline"] <= 1120-linkedin_discovery.config.REQUEST_TIMEOUT
+        raise LinkedInRequestDeadlineExceeded("cooldown exceeds lease budget")
+    result=linkedin_discovery._drain_tasks(4,300,user_agent="ua",detail_fetch=refuse,
+        save_details=lambda *args:pytest.fail("no source request was made"),deadline=5000)
+    assert result.outcome=="budget_deferred" and result==[]
+    assert claims==[1] and transitions[0][1]["error_code"]=="local_budget_deferred"
+
+
 def test_detail_drain_propagates_source_circuit(monkeypatch):
     task = {
         "id": 7,

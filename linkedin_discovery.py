@@ -594,6 +594,17 @@ def _drain_tasks(
             break
         for task in tasks:
             try:
+                task_deadline = deadline
+                lease_expires = _parse_optional_timestamptz(task.get("lease_expires_at"))
+                if lease_expires is not None:
+                    # Cooldowns can exceed a lease. Yield while this exact lease
+                    # is still releasable, reserving one request timeout for RPC
+                    # cleanup; never wait out a source cooldown on an expired lease.
+                    lease_deadline = time.monotonic() + max(
+                        0, (lease_expires - datetime.now(timezone.utc)).total_seconds()
+                        - config.REQUEST_TIMEOUT,
+                    )
+                    task_deadline = min(deadline, lease_deadline) if deadline is not None else lease_deadline
                 result = detail_fetch(
                     str(task["source_job_id"]),
                     search_card=task.get("search_card") or {},
@@ -603,7 +614,7 @@ def _drain_tasks(
                     physical_attempts=physical_attempts,
                     physical_limit=physical_limit,
                     required_fields=("company", "job_title"),
-                    deadline=deadline,
+                    deadline=task_deadline,
                 )
                 if result is None:
                     supabase_utils.transition_linkedin_discovery_task(

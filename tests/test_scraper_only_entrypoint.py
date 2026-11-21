@@ -1,5 +1,6 @@
 """Original scraper entrypoint, boundary doubles, no network or LLM calls."""
 import json
+import pytest
 import llm_client
 import linkedin_discovery as discovery
 import scraper
@@ -7,12 +8,13 @@ from test_lane_scraper_orchestration import configuration
 from test_scraper_only_manual import PendingRead
 
 
-def test_original_entrypoint_drains_300_of_927_without_llm(monkeypatch, tmp_path):
+@pytest.mark.parametrize("queue_size,retry_only",[(927,False),(11,True)])
+def test_original_entrypoint_drains_pending_or_retry_only_without_llm(monkeypatch, tmp_path,queue_size,retry_only):
     task_limit, physical_limit = 300, 800
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_CYCLE_ID", "123")
     monkeypatch.setenv("LINKEDIN_DETAIL_ONLY_SEQUENCE", "456")
-    monkeypatch.setattr(discovery.supabase_utils, "supabase", PendingRead(927))
-    monkeypatch.setattr(discovery.supabase_utils, "linkedin_actionable_task_count", lambda: 927)
+    monkeypatch.setattr(discovery.supabase_utils, "supabase", PendingRead(0 if retry_only else queue_size))
+    monkeypatch.setattr(discovery.supabase_utils, "linkedin_actionable_task_count", lambda: queue_size)
     configured = configuration()
     configured = configured.model_copy(update={"settings": configured.settings.model_copy(update={
         "options": {**configured.settings.options, "max_detail_tasks_per_run": task_limit,
@@ -46,10 +48,14 @@ def test_original_entrypoint_drains_300_of_927_without_llm(monkeypatch, tmp_path
                         lambda cycle_id: resolutions.append(cycle_id))
     tasks = [{"id": i, "source_job_id": str(i), "lease_token": f"lease-{i}",
               "first_ingestion_run_id": "original-run", "search_card": {},
-              "provenance": {"lane": "technology_delivery"}} for i in range(927)]
+              "status":"failed_retryable" if retry_only else "pending",
+              "attempt_count":1 if retry_only else 0,
+              "provenance": {"lane": "technology_delivery"}} for i in range(queue_size)]
     claims, heartbeats, saves, gates = [], [], [], []
     def claim(worker_id, **kwargs):
         assert kwargs["limit"] == 1
+        if not tasks:
+            return []
         task = tasks.pop(0)
         claims.append((worker_id, task))
         return [task]
@@ -72,8 +78,9 @@ def test_original_entrypoint_drains_300_of_927_without_llm(monkeypatch, tmp_path
         saves.append((task["id"], worker_id, task["lease_token"]))
         return f"canonical-{task['id']}"
     monkeypatch.setattr(discovery.supabase_utils, "apply_linkedin_discovery_task_canonical", apply)
-    assert scraper.main() == [f"canonical-{i}" for i in range(300)]
-    assert len(tasks) == 627
-    assert len(gates) == 300 and all(g is gates[0] for g in gates)
+    drained=min(300,queue_size)
+    assert scraper.main() == [f"canonical-{i}" for i in range(drained)]
+    assert len(tasks) == queue_size-drained
+    assert len(gates) == drained and all(g is gates[0] for g in gates)
     assert heartbeats == saves == [(t["id"], w, t["lease_token"]) for w, t in claims]
     assert resolutions == [123]  # Existing guarded resolver retained, not publication.

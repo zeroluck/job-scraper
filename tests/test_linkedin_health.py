@@ -19,3 +19,13 @@ def test_stale_publication_is_visible_with_empty_queue_and_green_runs():
     assert any("publication_age" in a for a in alerts)
     assert any("scheduled_dispatches" in a for a in alerts)
     assert not any("covered_through_age" in a for a in alerts)
+
+
+def test_job_queue_wait_is_not_hidden_by_equal_run_start_metadata():
+    now=datetime(2026,11,21,20,tzinfo=timezone.utc)
+    created=now-timedelta(hours=1)
+    metrics,_=assess({},[{"event":"schedule","createdAt":created.isoformat(),
+        "startedAt":created.isoformat(),"scrapeStartedAt":(created+timedelta(minutes=17)).isoformat()}],now=now)
+    assert metrics["max_run_start_delay_seconds"]==0
+    assert metrics["max_scrape_job_start_delay_seconds"]==1020
+    assert metrics["scrape_job_start_observations"]==1
