@@ -151,6 +151,28 @@ def test_zero_invocation_budget_does_not_claim(monkeypatch):
     assert row == before
 
 
+@pytest.mark.parametrize("drain",[False,True])
+def test_provider_pool_failure_does_not_claim_or_send_later_batches(monkeypatch,drain):
+    from test_backfill_freehire_compat import Db
+    rows=[{"job_id":str(i),"provider":"linkedin","description":"APIs","freehire_compat_status":"pending"} for i in range(3)]
+    db=Db(rows)
+    monkeypatch.setattr(config,"FREEHIRE_CLASSIFY_REQUEST_BUDGET",10)
+    monkeypatch.setattr(freehire_compat,"pack_batches",lambda jobs,**_: [[row] for row in jobs])
+    calls=[]
+    class FailedPool:
+        model="test/model"
+        model_chain=None
+        def generate_content(self,**kwargs):
+            kwargs["request_budget"].consume()
+            calls.append(1)
+            raise RuntimeError("503 provider unavailable")
+    result=backfill_freehire_compat.run(apply=True,limit=3,drain_backlog=drain,db=db,client=FailedPool())
+    assert len(calls)==result["llm_requests"]==1
+    assert result["failed"]==1
+    assert db.rpc_names.count("claim_freehire_compat_jobs")==1
+    assert all(row["freehire_compat_status"]=="pending" for row in rows[1:])
+
+
 def test_exhaustion_does_not_schedule_a_classifier_retry(monkeypatch):
     monkeypatch.setattr(llm_client.litellm, "completion", lambda **_: response('{"jobs":[]}'))
     sleeps = []

@@ -239,7 +239,7 @@ def run(
                 total = {key: 0 for key in page_result}
             for key, value in page_result.items():
                 total[key] += value
-            if not apply or request_budget.exhausted or page_result["scanned"] == 0:
+            if not apply or request_budget.exhausted or page_result["scanned"] == 0 or page_result.get("provider_deferred"):
                 break
             progress = (
                 page_result["classified"]
@@ -256,7 +256,7 @@ def run(
             "would_classify": 0, "classified": 0, "failed": 0,
             "claimed_elsewhere": 0, "cooldown_or_exhausted": 0,
             "remote_true": 0, "remote_false": 0, "llm_requests": 0,
-            "retries": 0, "splits": 0,
+            "retries": 0, "splits": 0, "provider_deferred": 0,
         }
     limit = limit or config.FREEHIRE_CLASSIFY_LIMIT
     counts = {
@@ -273,6 +273,7 @@ def run(
         "llm_requests": 0,
         "retries": 0,
         "splits": 0,
+        "provider_deferred": 0,
     }
     # --drain-backlog controls eligibility/sweep intent only. `limit` remains a
     # hard per-process ceiling so a recovery run cannot become unbounded.
@@ -410,6 +411,11 @@ def run(
         counts["classified"] += len(persisted & result_ids)
         counts["failed"] += len(persisted - result_ids)
         counts["claimed_elsewhere"] += len(persistence) - len(persisted)
+        if outcome.global_error:
+            # Shared provider/quota failures are not evidence about later jobs.
+            # Persist this batch's real outcome, then leave later work unclaimed.
+            counts["provider_deferred"] = 1
+            break
 
     return counts
 

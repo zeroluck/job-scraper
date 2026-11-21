@@ -103,6 +103,46 @@ New focused tests and the isolated native-role qualification pass separately.
 
 ## Bounded operations
 
+Initial application release: `9b88fed27ec7b7cd3a8659e8934cf027dd3d7ba5`.
+Companion migration mirror: `9931abf59fb6c95e6b865906b35f51afc6087b75`.
+Both repositories' migration-drift Actions checks passed.
+
+The first SDK preflight, run `44945429211`, correctly stopped before source
+traffic with `PGRST202`. Native `db-channel-enabled=false` means SQL NOTIFY does
+not refresh this service's schema cache. After fresh identity/lease/workflow
+checks, SIGUSR1 was sent only to the main process of
+`jobs-postgrest-native.service` at `2026-11-21T20:19:04Z`. PID304 and service
+start time remained unchanged; no restart or credential/configuration change
+was performed. Subsequent actual GitHub `job_runner` SDK preflights passed.
+Future native schema deployments must include this schema-only reload and
+actual Data API readback; administrative SQL alone is insufficient.
+
+Live source qualification through `2026-11-21T20:25:27Z`:
+
+| Run | Physical detail HTTP outcomes | Persisted outcome |
+| --- | --- | --- |
+| 44945630179 | one 429 | yielded; 60-second shared cooldown; spacing 5→10 seconds |
+| 44945821681 | six 200, one 429 | six applications; yielded; 120-second cooldown; spacing 10→20 seconds |
+
+Each physical attempt has a durable grant/lease-attempt row. Both runs retained
+cycle70/sequence70, released all leases, and recorded runner/release/response
+headers. The first six applications cover six distinct source IDs and six
+canonical IDs, including four new canonical inserts. Broken listing linkage:
+zero. Remaining cohort: 696 pending +12 retryable =708; the momentary ready
+count excludes any future retry until its availability timestamp.
+
+These canaries demonstrate bounded feedback and successful ingestion, **not**
+yet low-429 sustainable throughput. Do not increase dispatch frequency or
+concurrency on this evidence.
+
+The 12 inherited classification failures were freshly reviewed: six recorded
+provider429, six provider503, durable attempt counts6–9. All are excluded by the
+normal cap6. The manual classifier now exposes a physical request budget and
+a supported, invocation-local cap10 eligibility override. Use that override
+only after a healthy provider canary; it preserves all prior attempt counts.
+Shared provider-pool failures stop later batches/pages instead of amplifying
+calls across the invocation.
+
 Before each dispatch re-read cycle/sequence, actionable work, leases, cooldown,
 circuit, configuration, release SHA, and active/queued workflows. Use the
 existing `linkedin-freehire-pipeline` global concurrency group.

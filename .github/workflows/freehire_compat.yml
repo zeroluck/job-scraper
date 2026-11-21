@@ -14,6 +14,18 @@ on:
         required: true
         default: false
         type: boolean
+      request_budget:
+        description: "Physical provider requests, including failures and fallback attempts"
+        required: true
+        default: '10'
+        type: choice
+        options: ['1', '4', '10', '40']
+      max_durable_attempts:
+        description: "Keep 6 normally; 10 is a reviewed eligibility override that preserves attempt history"
+        required: true
+        default: '6'
+        type: choice
+        options: ['6', '10']
       drain_backlog:
         description: "Continue fetching batches until no eligible work remains"
         required: true
@@ -65,6 +77,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           FREEHIRE_CLASSIFY_LIMIT: ${{ inputs.limit }}
+          FREEHIRE_CLASSIFY_REQUEST_BUDGET: ${{ inputs.request_budget }}
+          FREEHIRE_CLASSIFY_MAX_DURABLE_ATTEMPTS: ${{ inputs.max_durable_attempts }}
           FREEHIRE_APPLY: ${{ inputs.apply }}
           FREEHIRE_DRAIN_BACKLOG: ${{ inputs.drain_backlog }}
           FREEHIRE_REPLACEMENT_BACKFILL: ${{ inputs.replacement_backfill }}
