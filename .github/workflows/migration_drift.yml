@@ -8,12 +8,14 @@ on:
       - "supabase_setup/**"
       - "scripts/check_migration_drift.py"
       - "tests/test_sql_setup.py"
+      - "tests/test_linkedin_native_remediation.py"
       - ".github/workflows/migration_drift.yml"
   pull_request:
     paths:
       - "supabase_setup/**"
       - "scripts/check_migration_drift.py"
       - "tests/test_sql_setup.py"
+      - "tests/test_linkedin_native_remediation.py"
       - ".github/workflows/migration_drift.yml"
   workflow_dispatch:
 
