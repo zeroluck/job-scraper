@@ -14,6 +14,13 @@
       "name": "linkedin_ingestion_remediation",
       "at": "2026-11-21T20:11:38Z",
       "receipt": "linkedin-remediation-deploy-20261121T201138Z.json",
+      "migration_sha256": {
+        "reconcile_linkedin_actionable_selector.sql": "7f9478cc9be8e35615b2843fe4683fa5a8b54040e8721e2d6d14878516dbeabd",
+        "repair_linkedin_continuation.sql": "fbee4c9a08898da22dfa70f77047494a858551a904e61870f8f628bdd3b7bdb1",
+        "repair_linkedin_retry_accounting.sql": "c6f699a3778b8390fb8915b6af20c42128b12ba25537b0cc31f693e56ae40ea4",
+        "linkedin_durable_throttling.sql": "2b46c97fd30a800c4966a32a2cb51da0a36d57e7bcc4b1a939467c2e79590654",
+        "linkedin_publication_diagnostics.sql": "856f3ec0b21dce0b5b028645aed278067ece6105f926c02122a1992212b48fe2"
+      },
       "verification": "Identity/function/state-guarded atomic application; actual job_runner diagnostics returned cycle70,714 actionable,1184 requirements,65 debt,generation71."
     }
   ],

@@ -95,7 +95,7 @@ processes/connections, duplicate-feedback idempotency, and the challenge circuit
 Migrations are reapplied to verify idempotency. This is distinct from a live
 Data API/workflow canary, which is also required before operational acceptance.
 
-Local whole-suite qualification: 682 passed, 12 skipped, six existing failures
+Local whole-suite qualification: 693 passed, 12 skipped, six existing failures
 reproduced individually against deployed-source worktree `7ffa7a3`. Those are
 the disabled job-manager undefined `response_text_lower`, four legacy tests
 with incomplete database doubles, and Python 3.14's strict private-CA fixture.
@@ -142,6 +142,95 @@ a supported, invocation-local cap10 eligibility override. Use that override
 only after a healthy provider canary; it preserves all prior attempt counts.
 Shared provider-pool failures stop later batches/pages instead of amplifying
 calls across the invocation.
+
+## Final operational checkpoint
+
+Identity-guarded readback at `2026-11-21T21:02:37Z`; exact real-role and canonical
+receipts are retained in `linkedin-recovery-final-proof.json`.
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| Selected sealed cycle / sequence | 70 /70 | 70 /70 |
+| Ready detail tasks | 714 | **699** (687 pending +12 retryable) |
+| Leased detail tasks | 0 | **0** |
+| Unsatisfied requirements / distinct tasks | 1,184 /714 | **1,165 /699** |
+| Classification current | 34,048 | **34,175** |
+| Classification pending / failed / processing | 105 /12 /0 | **0 /0 /0** |
+| LinkedIn canonical jobs | 34,165 | **34,175** |
+| Immutable generation / rows / source cycle | 71 /23,745 /49 | **unchanged** |
+| Failed predecessors / expired debt | 50,51 /65 | **unchanged** |
+
+Detail receipts distinguish **15 task applications**, **15 distinct source
+IDs**, **14 distinct canonical IDs**, **10 canonical inserts**, and **5 updates**.
+All completed cohort tasks have correct listing-state linkage. All40 existing
+terminal-unavailable tasks retain qualifying same-lease 404/410 request evidence.
+The cohort's attempt-counter increase is exactly20, matching20 physical detail
+grants; no counters decreased. No new requirement acceptance, debt resolution,
+or failed-cycle resolution was created. The strict finalizer's definition is
+byte-for-byte unchanged.
+
+Additional source results:
+
+| Run | Physical outcomes | Starting effective spacing |
+| --- | --- | ---: |
+| 44946222894 | one200, one429 | 20 seconds |
+| 44946844011 | three200, one429 | 40 seconds |
+| 44946988227 (ordinary scheduled run) | five200, one429 | 60 seconds |
+
+The scheduled run first observed the persisted cooldown from the previous
+runner, made no source request until its expiry, then yielded on its own429.
+Across these five source invocations: **15 HTTP200 /5 HTTP429**, with complete
+grant/lease-attempt evidence and zero unfinished grants. Even the60-second
+spacing run had a429. Sustainable low-429 throughput is **not qualified**;
+further manual source drains were stopped rather than increasing concurrency
+or resetting the policy. Effective spacing is60 seconds, circuit remains
+closed, and the last persisted cooldown expires `2026-11-21T21:04:33.015321Z`.
+Re-read that policy before any subsequent operation.
+
+Classification runs `44946415438` and `44946663750` applied79 and44 results,
+using4/4 and2/4 physical provider requests respectively. After the healthy
+first run, the second used the reviewed cap10 eligibility override to recover
+all12 inherited failures. Each of those12 now has exactly its previous attempt
+count plus one. The scheduled run then classified another7 eligible rows with
+1/10 physical provider requests **despite its scrape job failing**. No claims
+or failures remain in the observed classifier cohort.
+
+Live read-only qualification runs `44947160096` and `44947708380` passed SDK
+reads, exact native diagnostic RPCs, and intentionally failed-upstream gate
+reporting without invoking a finalizer. The report correctly separated
+`current_view_rows` from generation71's23,745 immutable rows. The scheduled
+pipeline also exported cycle70 on failure and reported predecessors50/51,
+65 debt rows,1,165 requirement rows,699 distinct tasks, and a10-row sample.
+
+Seven-day dispatch readback found **21 scheduled events /98 requested slots**.
+Actual scrape-job start metadata was inspected for all21 events; maximum
+creation-to-scrape-start wait was72 seconds. The missing events' cause remains
+unestablished. Source details and classification have made real progress;
+strict publication has not advanced.
+
+### Remaining acceptance blockers and next actions
+
+1. Qualify source access with bounded low-429 canaries under the shared policy
+   before resuming the699-task drain. Preserve the300-task ceiling and inspect
+   persisted cohort progress after every invocation. The current response rate
+   cannot support a completion claim or a reliable freshness SLO.
+2. Requalify a historical retrieval interface or supported subdivision against
+   original-parent controls. The78 targets remain inventory-unproven; no debt
+   recovery is asserted. At the current60-second policy, even the candidate's
+   smallest416-request batch cannot fit its1,620-second envelope. Its dated
+   anchor, batching/checkpoint contract, and physical budgets all need review.
+3. Preserve the user's strict publication decision. Cycles50/51 and65 expired
+   obligations still prevent a new immutable generation. Consumer acceptance
+   for a new generation and unchanged-input idempotency remain blocked behind
+   evidence-backed historical recovery.
+4. Install independently monitored dispatch/health execution and verify
+   consecutive cycles before claiming sustained operation. Disabled downstream
+   writers still require individual native-write qualification.
+
+Private, Git-ignored captures and reproducible collectors are archived under
+`docs/audits/2026-11-21-linkedin-remediation-evidence/`. Public workflow receipts
+remain available through the run IDs above. The original ignored audit report
+and the unrelated uncommitted enumeration worktree remain intact.
 
 Before each dispatch re-read cycle/sequence, actionable work, leases, cooldown,
 circuit, configuration, release SHA, and active/queued workflows. Use the
@@ -203,6 +292,7 @@ Multiple consecutive completed cycles and independent dispatch monitoring are
 still required. A watchdog running only when Actions dispatches cannot detect
 its own total scheduling outage. Run the read-only health collector from a
 separately monitored scheduler before claiming sustained dispatch reliability.
-Run-start timestamps do not establish runner-job queue delay or the cause of
+Run-start timestamps alone do not establish runner-job queue delay; the collector
+also reads actual scrape-job start times. Neither establishes the cause of
 missing schedule events. Analyzer/scorer/job-manager/resume workflows require
 their own native-write qualification before enabling.

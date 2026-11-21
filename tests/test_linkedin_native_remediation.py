@@ -26,6 +26,24 @@ def test_authoritative_sql_matches_required_web_history_mirror():
     assert actual==expected, "".join(difflib.unified_diff(expected.splitlines(True),actual.splitlines(True)))
 
 
+def test_native_applied_sql_cannot_be_silently_rewritten(tmp_path):
+    import hashlib
+    from scripts.check_migration_drift import history_hash
+    setup=tmp_path/"supabase_setup"
+    setup.mkdir()
+    migration=setup/"fixture.sql"
+    migration.write_text("SELECT 1;\n")
+    manifest={"applied":[],"history_hash":history_hash([]),"grandfathered":{},"local_only":{},
+        "owned":{"fixture":{"files":["job-scraper:supabase_setup/fixture.sql"]}},
+        "native_applied":[{"name":"fixture","migration_sha256":{"fixture.sql":hashlib.sha256(migration.read_bytes()).hexdigest()}}]}
+    (setup/"migration_manifest.json").write_text(json.dumps(manifest))
+    command=[os.sys.executable,str(ROOT/"scripts/check_migration_drift.py"),"--root",str(tmp_path),"--web-root",str(tmp_path/"absent")]
+    assert subprocess.run(command,capture_output=True).returncode==0
+    migration.write_text("SELECT 2;\n")
+    result=subprocess.run(command,text=True,capture_output=True)
+    assert result.returncode==1 and "native-applied-content-drift" in result.stdout
+
+
 @pytest.fixture(scope="module")
 def native():
     schema = os.getenv("LINKEDIN_NATIVE_SCHEMA")

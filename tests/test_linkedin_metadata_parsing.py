@@ -50,6 +50,7 @@ def test_fetch_linkedin_job_details_returns_content_and_metadata(monkeypatch):
 
     class Response:
         text = html
+        status_code = 200
 
         @staticmethod
         def raise_for_status():

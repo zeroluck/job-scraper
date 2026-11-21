@@ -125,3 +125,22 @@ def test_redirect_cannot_multiply_physical_requests_under_one_grant(monkeypatch,
         else:
             scraper._fetch_linkedin_job_details("fixture",durable_gate=Gate(),physical_attempts=attempts,physical_limit=10)
     assert len(sends)==attempts[0]==1
+
+
+@pytest.mark.parametrize("kind",["search","detail"])
+def test_grant_wait_reserves_request_time_without_a_physical_attempt(monkeypatch,kind):
+    import linkedin_discovery
+    import scraper
+    attempts=[0]
+    class Gate:
+        def acquire(self,*args,**kwargs):
+            assert kwargs["deadline"]==1000-scraper.config.REQUEST_TIMEOUT
+            raise linkedin_source_policy.LinkedInRequestDeadlineExceeded("no full request fits")
+    monkeypatch.setattr(scraper.requests,"get",lambda *args,**kwargs:pytest.fail("local deferral must not send"))
+    with pytest.raises((linkedin_source_policy.LinkedInRequestDeadlineExceeded,linkedin_discovery.DiscoveryBudgetDeferred)):
+        if kind=="search":
+            linkedin_discovery._request_page({"scope_key":"s","source_window_earliest_at":"2026-11-20T00:00:00Z"},1,
+                user_agent="ua",gate=Gate(),parse_cards=lambda _:[],physical_attempts=attempts,physical_limit=10,deadline=1000)
+        else:
+            scraper._fetch_linkedin_job_details("s",durable_gate=Gate(),physical_attempts=attempts,physical_limit=10,deadline=1000)
+    assert attempts==[0]

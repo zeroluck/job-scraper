@@ -302,7 +302,7 @@ def _request_page(
             grant = gate.acquire(
                 "search",
                 f"{scope['scope_key']}:{page_number}:{attempt}",
-                deadline=deadline,
+                deadline=deadline - config.REQUEST_TIMEOUT if deadline is not None else None,
             )
         except LinkedInRequestDeadlineExceeded as exc:
             raise DiscoveryBudgetDeferred(str(exc)) from exc

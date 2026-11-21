@@ -676,7 +676,8 @@ def _fetch_linkedin_job_details(
                     raise LinkedInRequestFailed("LinkedIn detail physical-attempt budget exhausted")
             if durable_gate is not None:
                 grant = durable_gate.acquire(
-                    "detail", f"{request_key or job_id}:{retries}", deadline=deadline
+                    "detail", f"{request_key or job_id}:{retries}",
+                    deadline=deadline - config.REQUEST_TIMEOUT if deadline is not None else None,
                 )
             request_timeout = config.REQUEST_TIMEOUT
             if deadline is not None:

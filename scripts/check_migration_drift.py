@@ -75,6 +75,20 @@ def main() -> int:
     grandfathered: dict = manifest.get("grandfathered", {})
     local_only: dict = manifest.get("local_only", {})
 
+    # Native applications have identity-guarded receipts rather than invented
+    # hosted history stamps. Pin every authoritative applied file by content.
+    for entry in manifest.get("native_applied", []):
+        name = entry["name"]
+        refs = owned.get(name, {}).get("files", [])
+        authoritative = {ref.rsplit("/", 1)[-1]: root / ref.split(":", 1)[1]
+                         for ref in refs if ref.startswith("job-scraper:")}
+        digests = entry.get("migration_sha256", {})
+        if not authoritative or set(digests) != set(authoritative):
+            errors.append(f"native-applied-missing-digests: {name} must pin every authoritative file")
+        for filename, path in authoritative.items():
+            if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != digests.get(filename):
+                errors.append(f"native-applied-content-drift: {name} -> {filename}; add a forward migration instead of rewriting applied SQL")
+
     # 1. Direction 1: every applied name must be classified.
     applied_names = [e["name"] for e in manifest["applied"]]
     for entry in manifest["applied"]:
