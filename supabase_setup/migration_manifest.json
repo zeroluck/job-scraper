@@ -22,6 +22,15 @@
         "linkedin_publication_diagnostics.sql": "856f3ec0b21dce0b5b028645aed278067ece6105f926c02122a1992212b48fe2"
       },
       "verification": "Identity/function/state-guarded atomic application; actual job_runner diagnostics returned cycle70,714 actionable,1184 requirements,65 debt,generation71."
+    },
+    {
+      "name": "fix_linkedin_isolated_rate_limits",
+      "at": "2026-11-22T22:24:46.279646Z",
+      "receipt": "linkedin-rate-forward-20261122.json",
+      "migration_sha256": {
+        "fix_linkedin_isolated_rate_limits.sql": "3f9c12050d499ea82c8f4a602efcdc30de45450031d807e91c79234c539c0fb2"
+      },
+      "verification": "Identity/function/zero-lease guarded application; derived denial streak8 corrected to history-backed1; effective spacing60000ms, cooldown and circuit preserved; actual job_runner readback retained cycle70,65 debt,generation71."
     }
   ],
   "applied": [
@@ -475,6 +484,13 @@
     }
   ],
   "owned": {
+    "fix_linkedin_isolated_rate_limits": {
+      "files": [
+        "job-scraper:supabase_setup/fix_linkedin_isolated_rate_limits.sql",
+        "web:supabase/migrations/20261122221814_fix_linkedin_isolated_rate_limits.sql"
+      ],
+      "note": "Incremental forward: reset the consecutive denial streak on successful HTTP outcomes; recompute derived streak without shortening cooldowns or resetting task attempts."
+    },
     "linkedin_ingestion_remediation": {
       "files": [
         "job-scraper:supabase_setup/reconcile_linkedin_actionable_selector.sql",

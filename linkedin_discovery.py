@@ -295,6 +295,8 @@ def _request_page(
     last_error: Exception | None = None
     for attempt in range(config.MAX_RETRIES + 1):
         if physical_attempts[0] >= physical_limit:
+            if isinstance(last_error, DiscoveryRateLimited):
+                raise last_error
             raise DiscoveryBudgetDeferred(
                 "LinkedIn physical HTTP-attempt budget exhausted"
             )
@@ -305,6 +307,8 @@ def _request_page(
                 deadline=deadline - config.REQUEST_TIMEOUT if deadline is not None else None,
             )
         except LinkedInRequestDeadlineExceeded as exc:
+            if isinstance(last_error, DiscoveryRateLimited):
+                raise last_error from exc
             raise DiscoveryBudgetDeferred(str(exc)) from exc
         fetch_anchor = _effective_fetch_anchor(scope, anchor)
         lookback_seconds = max(1, math.ceil((grant.started_at - fetch_anchor).total_seconds()))
@@ -358,7 +362,11 @@ def _request_page(
             if kind == "http_error":
                 gate.finish(grant, "http_error", response.status_code, response=response)
                 if response.status_code == 429:
-                    raise DiscoveryRateLimited("LinkedIn search HTTP 429; shared cooldown required")
+                    last_error = DiscoveryRateLimited("LinkedIn search HTTP 429 exhausted bounded retries")
+                    if attempt < config.MAX_RETRIES:
+                        logging.warning("LinkedIn search HTTP 429; retrying page %s after the shared cooldown", page_number)
+                        continue
+                    raise last_error
                 if 500 <= response.status_code < 600:
                     last_error = DiscoveryError(f"LinkedIn search HTTP {response.status_code}")
                     if attempt < config.MAX_RETRIES:

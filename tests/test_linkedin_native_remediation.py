@@ -24,6 +24,8 @@ def test_authoritative_sql_matches_required_web_history_mirror():
     expected="\n".join((ROOT/"supabase_setup"/name).read_text() for name in MIGRATIONS)
     actual="\n".join(mirror.read_text().splitlines()[3:])+"\n"
     assert actual==expected, "".join(difflib.unified_diff(expected.splitlines(True),actual.splitlines(True)))
+    followup=ROOT.parent/"job-scraper-web/supabase/migrations/20261122221814_fix_linkedin_isolated_rate_limits.sql"
+    assert followup.read_text()==(ROOT/"supabase_setup/fix_linkedin_isolated_rate_limits.sql").read_text()
 
 
 def test_native_applied_sql_cannot_be_silently_rewritten(tmp_path):
@@ -75,7 +77,7 @@ def native():
             sql('CREATE ROLE "' + role["rolname"].replace('"', '""') + '" NOLOGIN;')
         sql(Path(schema).read_text())
         for _ in range(2):
-            for migration in MIGRATIONS:
+            for migration in [*MIGRATIONS,"fix_linkedin_isolated_rate_limits.sql"]:
                 sql((ROOT / "supabase_setup" / migration).read_text())
         sql("""
 INSERT INTO public.linkedin_source_request_policy(source,minimum_interval_ms) VALUES ('linkedin',2500);
@@ -146,6 +148,23 @@ def test_shared_cooldown_survives_new_connections_and_all_producers(native):
     assert policy["effective_interval_ms"]==10000 and policy["consecutive_429"]==1
     # Duplicate completion must not apply feedback twice.
     assert native(f"SELECT public.finish_linkedin_request_grant('{grant['grant_id']}','producer-a','http_error',429)",role="job_runner").stdout.strip()=="f"
+    for i,(status,streak) in enumerate([(200,0),(429,1),(200,0),(429,1),(429,2)]):
+        # Advance the isolated fixture's scheduling clock without real sleeps.
+        native("UPDATE public.linkedin_source_request_policy SET cooldown_until=now(),next_allowed_at=now()")
+        g=json.loads(native(f"SELECT public.acquire_linkedin_request_grant('producer-a','search','sequence-{i}')",role="job_runner").stdout)
+        native(f"SELECT public.finish_linkedin_request_grant('{g['grant_id']}','producer-a','complete',{status})",role="job_runner")
+        p=json.loads(native("SELECT row_to_json(p) FROM public.linkedin_source_request_policy p").stdout)
+        assert p["consecutive_429"]==streak
+        if status==429:
+            cooldown=float(native("SELECT extract(epoch FROM cooldown_until-clock_timestamp()) FROM public.linkedin_source_request_policy").stdout)
+            assert (58 if streak==1 else 118)<=cooldown<=(60 if streak==1 else 120)
+    before=json.loads(native("SELECT row_to_json(p) FROM public.linkedin_source_request_policy p").stdout)
+    native("UPDATE public.linkedin_source_request_policy SET consecutive_429=8")
+    native((ROOT/"supabase_setup/fix_linkedin_isolated_rate_limits.sql").read_text())
+    after=json.loads(native("SELECT row_to_json(p) FROM public.linkedin_source_request_policy p").stdout)
+    assert after["consecutive_429"]==2
+    for key in ("cooldown_until","effective_interval_ms","circuit_state","circuit_generation"):
+        assert after[key]==before[key]
     native("UPDATE public.linkedin_source_request_policy SET cooldown_until=now(),next_allowed_at=now()")
     grant=json.loads(native("SELECT public.acquire_linkedin_request_grant('producer-b','search','fixture')",role="job_runner").stdout)
     native(f"SELECT public.open_linkedin_source_circuit('{grant['grant_id']}','producer-b','real challenge',999)",role="job_runner")

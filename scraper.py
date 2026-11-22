@@ -29,6 +29,7 @@ from linkedin_source_policy import (
     DurableLinkedInRequestGate,
     LinkedInCircuitOpen,
     LinkedInGrantRejected,
+    LinkedInRequestDeadlineExceeded,
     LinkedInRateLimited,
     is_linkedin_challenge,
 )
@@ -666,19 +667,28 @@ def _fetch_linkedin_job_details(
 
     logging.info(f"Fetching details from: {job_detail_url}")
 
-    resp = None 
+    resp = None
     retries = 0
+    not_found_responses = 0
+    last_http_status = None
     while retries <= config.MAX_RETRIES:
         grant = None
         try:
             if physical_attempts is not None:
                 if physical_limit is not None and physical_attempts[0] >= physical_limit:
+                    if last_http_status == 429:
+                        raise LinkedInRateLimited("LinkedIn detail rate limit could not recover within the physical budget")
                     raise LinkedInRequestFailed("LinkedIn detail physical-attempt budget exhausted")
             if durable_gate is not None:
-                grant = durable_gate.acquire(
-                    "detail", f"{request_key or job_id}:{retries}",
-                    deadline=deadline - config.REQUEST_TIMEOUT if deadline is not None else None,
-                )
+                try:
+                    grant = durable_gate.acquire(
+                        "detail", f"{request_key or job_id}:{retries}",
+                        deadline=deadline - config.REQUEST_TIMEOUT if deadline is not None else None,
+                    )
+                except LinkedInRequestDeadlineExceeded as exc:
+                    if last_http_status == 429:
+                        raise LinkedInRateLimited("LinkedIn detail rate limit could not recover within the lease/runtime budget") from exc
+                    raise
             request_timeout = config.REQUEST_TIMEOUT
             if deadline is not None:
                 request_timeout = min(
@@ -708,9 +718,14 @@ def _fetch_linkedin_job_details(
             raise
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code
-            if status_code == 404 and retries < 1:
+            last_http_status = status_code
+            if status_code == 404:
+                not_found_responses += 1
+            if status_code == 404 and not_found_responses < 2:
                 if durable_gate is not None and grant is not None:
                     durable_gate.finish(grant, "not_found_unconfirmed", status_code, response=e.response)
+                if retries >= config.MAX_RETRIES:
+                    raise LinkedInRequestFailed(f"LinkedIn detail 404 unconfirmed within retry budget for job {job_id}") from e
                 retries += 1
                 if deadline is not None and time.monotonic() + config.RETRY_DELAY_SECONDS >= deadline:
                     raise LinkedInRequestFailed(
@@ -732,7 +747,18 @@ def _fetch_linkedin_job_details(
             if durable_gate is not None and grant is not None:
                 durable_gate.finish(grant, "http_error", status_code, response=e.response)
                 if status_code == 429:
-                    raise LinkedInRateLimited(f"LinkedIn detail HTTP 429 for job {job_id}; yielding to shared cooldown") from e
+                    if retries >= config.MAX_RETRIES:
+                        raise LinkedInRateLimited(
+                            f"LinkedIn detail HTTP 429 exhausted bounded retries for job {job_id}"
+                        ) from e
+                    retries += 1
+                    logging.warning(
+                        "LinkedIn detail HTTP 429 for job %s; retry %s/%s will acquire a fresh grant after the shared cooldown",
+                        job_id, retries, config.MAX_RETRIES,
+                    )
+                    # The durable gate owns Retry-After/backoff. Retry under the
+                    # same live task lease and the existing physical/runtime caps.
+                    continue
             if status_code in (429, 500, 502, 503, 504) and retries < config.MAX_RETRIES:
                 retries += 1
                 wait_time = max(

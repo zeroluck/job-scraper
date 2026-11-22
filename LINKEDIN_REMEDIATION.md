@@ -1,5 +1,36 @@
 # LinkedIn remediation — 2026-11-21
 
+## November22 operational follow-up
+
+The initial recovery did not restore reliable execution. Three subsequent
+scheduled invocations still failed on the first429, despite25 successful detail
+applications. Fresh readback at `2026-11-22T22:11:10Z` found674 actionable tasks,
+zero leases/classifier backlog, and the same strict historical publication barrier.
+
+Two defects in the initial throttling change were confirmed:
+
+- A single429 aborted the entire invocation before using the already bounded
+  request-retry path. It should retry with a fresh durable grant under the same
+  valid lease; sustained denial remains alertable after bounded retry exhaustion.
+- The denial-streak counter reset only after20 successful responses, so isolated
+  throttles accumulated across successful requests and across days. The live
+  counter was8 while retained outcome history proved a trailing streak of1.
+  Successful HTTP outcomes must end the denial streak immediately; the separate
+  pacing-recovery counter remains cautious.
+
+The incremental forward `fix_linkedin_isolated_rate_limits.sql` repairs the
+derived streak from retained grant history without shortening any cooldown,
+changing request spacing, clearing the circuit, or resetting task attempts.
+Search/detail retries remain subject to the original physical limits and
+lease/runtime deadlines. 404 confirmation now counts actual404 responses,
+independently of earlier429 retries.
+
+Acceptance:429→200 recovers without failing or duplicating task attempts;
+200→429→200→429 does not inflate a denial streak; repeated429s still back off
+and stop within physical/runtime limits; native owner/ACLs and strict publication
+state remain unchanged; a bounded live batch must demonstrate persisted progress
+past a throttle before operational recovery is claimed.
+
 ## Authority and decisions
 
 This session is authorized to commit/push, deploy qualified narrow fixes, and
