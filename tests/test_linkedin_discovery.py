@@ -650,6 +650,7 @@ def test_cycle_replay_uses_persisted_window(monkeypatch):
     (LinkedInCircuitOpen("http_status=999"), "challenged"),
     (linkedin_discovery.DiscoveryBudgetDeferred("local deadline"), "budget_deferred"),
     (linkedin_discovery.DiscoveryRateLimited("HTTP 429"), "rate_limited"),
+    (linkedin_discovery.DiscoveryRateLimitDeferred("cooldown exceeds budget"), "rate_limited"),
     (linkedin_discovery.RetryableDiscoveryInterruption("HTTP 503"), "failed"),
 ])
 def test_interruption_retains_cycle_and_exports_distinct_outcome(monkeypatch, tmp_path, interruption, outcome):
@@ -728,8 +729,8 @@ def test_interruption_retains_cycle_and_exports_distinct_outcome(monkeypatch, tm
             save_details=lambda *_args: None,
             partial=False,
         )
-    if outcome == "budget_deferred":
-        assert run().outcome == "budget_deferred"
+    if isinstance(interruption, linkedin_discovery.DiscoveryBudgetDeferred):
+        assert run().outcome == outcome
     else:
         with pytest.raises(linkedin_discovery.LinkedInDiscoveryInterrupted, match="cycle_id=7 remains resumable"):
             run()

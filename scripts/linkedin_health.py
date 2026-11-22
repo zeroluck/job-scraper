@@ -26,7 +26,7 @@ def expected_dispatches(start, end):
 
 def assess(diagnostic, runs, *, now):
     def parse(value):
-        return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+        return datetime.fromisoformat(value.replace("Z", "+00:00")) if value and value not in {"-infinity","infinity"} else None
     def age(value):
         timestamp=parse(value)
         return max(0, (now-timestamp).total_seconds()) if timestamp else None
@@ -35,6 +35,8 @@ def assess(diagnostic, runs, *, now):
     nominal=len(expected_dispatches(start,now))
     publication=diagnostic.get("publication") or {}
     classification=diagnostic.get("classification") or {}
+    policy=diagnostic.get("source_policy") or {}
+    cooldown=parse(policy.get("cooldown_until"))
     metrics={
         "expected_dispatches_7d":nominal,"actual_scheduled_dispatches_7d":len(scheduled),
         "dispatch_ratio_7d":len(scheduled)/nominal if nominal else None,
@@ -50,6 +52,7 @@ def assess(diagnostic, runs, *, now):
         "publication_generation":publication.get("generation"),"publication_rows":publication.get("row_count"),
         "predecessor_ids":diagnostic.get("predecessor_ids"),"coverage_debt_count":diagnostic.get("coverage_debt_count"),
         "source_policy":diagnostic.get("source_policy"),
+        "source_cooldown_remaining_seconds":max(0,(cooldown-now).total_seconds()) if cooldown else 0,
         "dispatch_interpretation":"Requested versus recorded events; does not establish why events were omitted. Scrape job start minus run creation measures observed dispatch/concurrency/runner wait together; run-start metadata alone does not measure that wait."
     }
     metrics["classification_age_basis"]="Pending age is canonical first_seen_at, not time entering pending status; pending_since is not persisted. Claim age uses the actual claim timestamp."
@@ -62,7 +65,8 @@ def assess(diagnostic, runs, *, now):
         alerts.append(f"scheduled_dispatches_7d={len(scheduled)}/{nominal}; investigate dispatch/start gaps")
     if metrics["max_scrape_job_start_delay_seconds"] is not None and metrics["max_scrape_job_start_delay_seconds"]>3600:
         alerts.append("scrape job start delayed more than 3600 seconds; inspect workflow concurrency and runner queue")
-    policy=diagnostic.get("source_policy") or {}
+    if metrics["source_cooldown_remaining_seconds"]>0 and diagnostic.get("actionable_tasks",0)>0:
+        alerts.append(f"LinkedIn shared cooldown active until {policy['cooldown_until']}; work remains durably deferred")
     if policy.get("circuit_state")=="open":
         alerts.append("LinkedIn challenge circuit open; investigate retained denial evidence")
     return metrics,alerts

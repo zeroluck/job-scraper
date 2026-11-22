@@ -30,6 +30,7 @@ from linkedin_source_policy import (
     LinkedInCircuitOpen,
     LinkedInGrantRejected,
     LinkedInRequestDeadlineExceeded,
+    LinkedInRateLimitDeferred,
     LinkedInRateLimited,
     is_linkedin_challenge,
 )
@@ -677,7 +678,7 @@ def _fetch_linkedin_job_details(
             if physical_attempts is not None:
                 if physical_limit is not None and physical_attempts[0] >= physical_limit:
                     if last_http_status == 429:
-                        raise LinkedInRateLimited("LinkedIn detail rate limit could not recover within the physical budget")
+                        raise LinkedInRateLimitDeferred("LinkedIn detail cooldown deferred by the physical budget")
                     raise LinkedInRequestFailed("LinkedIn detail physical-attempt budget exhausted")
             if durable_gate is not None:
                 try:
@@ -687,7 +688,7 @@ def _fetch_linkedin_job_details(
                     )
                 except LinkedInRequestDeadlineExceeded as exc:
                     if last_http_status == 429:
-                        raise LinkedInRateLimited("LinkedIn detail rate limit could not recover within the lease/runtime budget") from exc
+                        raise LinkedInRateLimitDeferred("LinkedIn detail cooldown deferred by the lease/runtime budget") from exc
                     raise
             request_timeout = config.REQUEST_TIMEOUT
             if deadline is not None:
@@ -1705,7 +1706,7 @@ def _run_database_configured_linkedin(
             config.ENABLE_REPOST_DEDUP = previous_repost_dedup
         saved_job_ids.extend(result.canonical_job_ids)
         os.environ["LINKEDIN_DISCOVERY_CYCLE_ID"] = str(result.cycle_id)
-        if getattr(result, "outcome", "completed") == "rate_limited":
+        if getattr(result, "source_failure", False):
             raise linkedin_discovery.LinkedInDiscoveryInterrupted(
                 f"LinkedIn details rate-limited; cycle_id={result.cycle_id}; shared cooldown persisted"
             )

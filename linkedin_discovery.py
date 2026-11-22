@@ -27,6 +27,7 @@ from linkedin_source_policy import (
     LinkedInGrantRejected,
     LinkedInRequestDeadlineExceeded,
     LinkedInRateLimited,
+    LinkedInRateLimitDeferred,
     is_linkedin_challenge,
     linkedin_challenge_evidence,
 )
@@ -61,6 +62,10 @@ class DiscoveryRateLimited(RetryableDiscoveryInterruption):
     pass
 
 
+class DiscoveryRateLimitDeferred(DiscoveryBudgetDeferred):
+    pass
+
+
 class LinkedInDiscoveryInterrupted(DiscoveryError):
     pass
 
@@ -72,14 +77,16 @@ class DiscoveryResult:
     canonical_job_ids: tuple[str, ...]
     advance_watermark: bool
     outcome: str = "completed"
+    source_failure: bool = False
 
 
 class DetailDrainResult(list):
     """Canonical applications with the independent bounded-drain outcome."""
 
-    def __init__(self, saved=(), *, outcome="completed"):
+    def __init__(self, saved=(), *, outcome="completed", source_failure=False):
         super().__init__(saved)
         self.outcome = outcome
+        self.source_failure = source_failure
 
 
 def export_execution(cycle_id: int, sequence: int, outcome: str) -> None:
@@ -296,7 +303,7 @@ def _request_page(
     for attempt in range(config.MAX_RETRIES + 1):
         if physical_attempts[0] >= physical_limit:
             if isinstance(last_error, DiscoveryRateLimited):
-                raise last_error
+                raise DiscoveryRateLimitDeferred("LinkedIn search cooldown deferred by the physical budget")
             raise DiscoveryBudgetDeferred(
                 "LinkedIn physical HTTP-attempt budget exhausted"
             )
@@ -308,7 +315,7 @@ def _request_page(
             )
         except LinkedInRequestDeadlineExceeded as exc:
             if isinstance(last_error, DiscoveryRateLimited):
-                raise last_error from exc
+                raise DiscoveryRateLimitDeferred("LinkedIn search cooldown deferred by the runtime budget") from exc
             raise DiscoveryBudgetDeferred(str(exc)) from exc
         fetch_anchor = _effective_fetch_anchor(scope, anchor)
         lookback_seconds = max(1, math.ceil((grant.started_at - fetch_anchor).total_seconds()))
@@ -666,12 +673,19 @@ def _drain_tasks(
                     error_code="source_challenged",
                 )
                 raise
+            except LinkedInRateLimitDeferred as exc:
+                supabase_utils.transition_linkedin_discovery_task(
+                    task["id"], worker_id, task["lease_token"], "failed_retryable",
+                    error_code="source_rate_limited",
+                )
+                logging.warning("Detail drainage checkpointed for shared cooldown: %s", exc)
+                return DetailDrainResult(saved, outcome="rate_limited")
             except LinkedInRateLimited:
                 supabase_utils.transition_linkedin_discovery_task(
                     task["id"], worker_id, task["lease_token"], "failed_retryable",
                     error_code="source_rate_limited",
                 )
-                return DetailDrainResult(saved, outcome="rate_limited")
+                return DetailDrainResult(saved, outcome="rate_limited", source_failure=True)
             except LinkedInGrantRejected:
                 raise
             except (
@@ -899,7 +913,7 @@ def run_discovery(
                 supabase_utils.resolve_eligible_failed_linkedin_discovery_cycles(cycle_id)
             outcome = getattr(saved, "outcome", "completed")
             export_execution(cycle_id, sequence, outcome)
-            return DiscoveryResult(cycle_id, sequence, tuple(saved), not partial, outcome)
+            return DiscoveryResult(cycle_id, sequence, tuple(saved), not partial, outcome, getattr(saved, "source_failure", False))
         except Exception as exc:
             export_execution(cycle_id, sequence, "challenged" if isinstance(exc, LinkedInCircuitOpen) else "failed")
             raise
@@ -914,6 +928,7 @@ def run_discovery(
                 scope["status"] = "complete"
         search_deadline = run_started + options["search_runtime"]
         search_interrupted = False
+        search_deferred = False
         interruption_reason = None
         outcome = "budget_deferred"
         while (
@@ -940,10 +955,11 @@ def run_discovery(
                         exc,
                     )
                     search_interrupted = True
+                    search_deferred = isinstance(exc, DiscoveryBudgetDeferred)
                     interruption_reason = str(exc)
                     outcome = (
-                        "budget_deferred" if isinstance(exc, DiscoveryBudgetDeferred)
-                        else "rate_limited" if isinstance(exc, DiscoveryRateLimited)
+                        "rate_limited" if isinstance(exc, (DiscoveryRateLimited, DiscoveryRateLimitDeferred))
+                        else "budget_deferred" if isinstance(exc, DiscoveryBudgetDeferred)
                         else "challenged" if isinstance(exc, LinkedInCircuitOpen)
                         else "failed"
                     )
@@ -982,7 +998,7 @@ def run_discovery(
 
     if not coverage_complete:
         export_execution(cycle_id, sequence, outcome)
-        if outcome == "budget_deferred":
+        if outcome == "budget_deferred" or search_deferred:
             return DiscoveryResult(cycle_id, sequence, (), False, outcome)
         raise LinkedInDiscoveryInterrupted(
             f"LinkedIn discovery interrupted; cycle_id={cycle_id} remains resumable; "
@@ -1010,4 +1026,5 @@ def run_discovery(
         tuple(saved),
         bool(sealed.get("watermark_advanced")) if coverage_complete else False,
         outcome,
+        getattr(saved, "source_failure", False),
     )

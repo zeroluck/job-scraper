@@ -31,6 +31,17 @@ and stop within physical/runtime limits; native owner/ACLs and strict publicatio
 state remain unchanged; a bounded live batch must demonstrate persisted progress
 past a throttle before operational recovery is claimed.
 
+The first follow-up live canary (`45078236259`) proved recovery of429→200
+after60.69 seconds under the same lease, and applied6 tasks using9 physical
+requests. It subsequently encountered two more429s near its600-second cutoff.
+That exposed another outcome conflation: an unfunded next cooldown was still
+treated as exhausted source retries. `LinkedInRateLimitDeferred` now represents
+that resumable checkpoint explicitly. It releases the lease and reports
+`rate_limited` without a fatal execution result; exhausting the actual HTTP
+retry allowance, real challenges, and broken contracts remain failures.
+Gate/watchdog output includes the discovery outcome and an active-cooldown
+alert, so bounded execution success cannot be mistaken for fresh publication.
+
 ## Authority and decisions
 
 This session is authorized to commit/push, deploy qualified narrow fixes, and

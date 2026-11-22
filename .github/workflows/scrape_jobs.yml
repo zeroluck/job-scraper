@@ -136,6 +136,7 @@ jobs:
       published: ${{ steps.gate.outputs.published }}
       generation: ${{ steps.gate.outputs.generation }}
       outcome: ${{ steps.gate.outputs.outcome }}
+      discovery_outcome: ${{ steps.gate.outputs.discovery_outcome }}
       requested_cycle_id: ${{ steps.gate.outputs.requested_cycle_id }}
       eligible_cycle_id: ${{ steps.gate.outputs.eligible_cycle_id }}
       blocking_count: ${{ steps.gate.outputs.blocking_count }}
@@ -163,6 +164,7 @@ jobs:
           --scrape-result "${{ needs.scrape.result }}"
           --freehire-compat-result "${{ needs.freehire_compat.result }}"
           --discovery-cycle-id "${{ needs.scrape.outputs.discovery_cycle_id }}"
+          --discovery-outcome "${{ needs.scrape.outputs.discovery_outcome }}"
 
   gate_watchdog:
     env:
@@ -201,6 +203,7 @@ jobs:
           GATE_CYCLE_ID: ${{ needs.publication_gate.outputs.requested_cycle_id }}
           GATE_BLOCKING_DETAILS: ${{ needs.publication_gate.outputs.blocking_details }}
           GATE_GENERATION: ${{ needs.publication_gate.outputs.generation }}
+          DISCOVERY_OUTCOME: ${{ needs.publication_gate.outputs.discovery_outcome }}
           HEALTH_ALERTS: ${{ steps.health.outputs.alerts }}
         run: |
           if [ -z "$GATE_OUTCOME" ]; then
@@ -217,6 +220,7 @@ jobs:
             BODY="$BODY Cycle: \`$GATE_CYCLE_ID\`. Blocking: \`$GATE_BLOCKING_COUNT\`."
             BODY="$BODY Details: \`$GATE_BLOCKING_DETAILS\`."
             BODY="$BODY Health alerts: \`$HEALTH_ALERTS\`. Gate outcome: \`$GATE_OUTCOME\`."
+            BODY="$BODY Discovery execution outcome: \`$DISCOVERY_OUTCOME\`."
             BODY="$BODY Strict publication is deferred; ingestion and classification can still progress."
             BODY="$BODY Drain eligible work through guarded workers. Historical predecessors/debt require provenance-backed recovery; any acceptance requires a separate explicit decision."
             if [ -z "$OPEN_ISSUE" ]; then

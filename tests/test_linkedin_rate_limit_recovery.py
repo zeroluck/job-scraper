@@ -6,7 +6,7 @@ import pytest
 import requests
 
 import linkedin_discovery as discovery
-from linkedin_source_policy import ConsumedGrant, LinkedInRateLimited, LinkedInRequestDeadlineExceeded
+from linkedin_source_policy import ConsumedGrant, LinkedInRateLimited, LinkedInRateLimitDeferred, LinkedInRequestDeadlineExceeded
 import scraper
 
 
@@ -79,7 +79,7 @@ def test_sustained_429_remains_alertable_and_physically_bounded(monkeypatch,kind
 def test_rate_limit_retry_cannot_exceed_physical_invocation_budget(monkeypatch,kind):
     calls=transport(monkeypatch,kind,[429])
     gate=Gate();attempts=[0]
-    with pytest.raises((LinkedInRateLimited,discovery.DiscoveryRateLimited)):
+    with pytest.raises((LinkedInRateLimitDeferred,discovery.DiscoveryRateLimitDeferred)):
         fetch(kind,gate,attempts,limit=1)
     assert len(calls)==len(gate.grants)==attempts[0]==1
 
@@ -93,9 +93,22 @@ def test_unrecovered_429_is_not_disguised_as_pure_local_budget_exhaustion(monkey
                 raise LinkedInRequestDeadlineExceeded("cooldown cannot fit")
             return super().acquire(*args,**kwargs)
     gate=LimitedGate();attempts=[0]
-    with pytest.raises((LinkedInRateLimited,discovery.DiscoveryRateLimited)):
+    with pytest.raises((LinkedInRateLimitDeferred,discovery.DiscoveryRateLimitDeferred)):
         fetch(kind,gate,attempts)
     assert len(calls)==len(gate.grants)==attempts[0]==1
+
+
+@pytest.mark.parametrize("error,fatal",[(LinkedInRateLimitDeferred("budget"),False),(LinkedInRateLimited("retry exhaustion"),True)])
+def test_rate_limited_checkpoint_is_distinct_from_sustained_source_failure(monkeypatch,error,fatal):
+    task={"id":7,"source_job_id":"source-1","lease_token":"lease"}
+    transitions=[]
+    monkeypatch.setattr(discovery.supabase_utils,"claim_linkedin_discovery_tasks",lambda *args,**kwargs:[task])
+    monkeypatch.setattr(discovery.supabase_utils,"transition_linkedin_discovery_task",lambda *args,**kwargs:transitions.append((args,kwargs)))
+    def refuse(*args,**kwargs):
+        raise error
+    result=discovery._drain_tasks(70,1,user_agent="ua",detail_fetch=refuse,save_details=lambda *args:pytest.fail("no successful source response"))
+    assert result.outcome=="rate_limited" and result.source_failure is fatal
+    assert len(transitions)==1 and transitions[0][1]["error_code"]=="source_rate_limited"
 
 
 def test_a_prior_429_does_not_count_as_a_404_confirmation(monkeypatch):
@@ -106,3 +119,16 @@ def test_a_prior_429_does_not_count_as_a_404_confirmation(monkeypatch):
     assert result.confirmed_terminal_unavailable
     assert [r[1:] for r in gate.finished]==[("http_error",429),("not_found_unconfirmed",404),("terminal_unavailable",404)]
     assert len(calls)==attempts[0]==3
+
+
+@pytest.mark.parametrize("fatal",[False,True])
+def test_scraper_accepts_a_rate_limited_checkpoint_but_not_a_source_failure(monkeypatch,fatal):
+    from test_lane_scraper_orchestration import configuration
+    monkeypatch.setenv("LINKEDIN_DISCOVERY_MODE","adaptive_queue")
+    monkeypatch.setattr(discovery,"run_discovery",lambda *args,**kwargs:
+        discovery.DiscoveryResult(70,70,(),False,"rate_limited",fatal))
+    if fatal:
+        with pytest.raises(discovery.LinkedInDiscoveryInterrupted):
+            scraper._run_database_configured_linkedin(configuration(),[])
+    else:
+        assert scraper._run_database_configured_linkedin(configuration(),[]) is False

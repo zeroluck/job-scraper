@@ -31,6 +31,10 @@ class LinkedInRateLimited(RuntimeError):
     pass
 
 
+class LinkedInRateLimitDeferred(LinkedInRequestDeadlineExceeded):
+    """The shared cooldown cannot fit the remaining lease/invocation budget."""
+
+
 def linkedin_challenge_evidence(response: Any) -> str | None:
     status_code = getattr(response, "status_code", None)
     if status_code in (403, 999):

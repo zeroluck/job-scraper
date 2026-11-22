@@ -29,3 +29,11 @@ def test_job_queue_wait_is_not_hidden_by_equal_run_start_metadata():
     assert metrics["max_run_start_delay_seconds"]==0
     assert metrics["max_scrape_job_start_delay_seconds"]==1020
     assert metrics["scrape_job_start_observations"]==1
+
+
+def test_rate_limited_checkpoint_still_emits_an_actionable_cooldown_alert():
+    now=datetime(2026,11,22,22,tzinfo=timezone.utc)
+    metrics,alerts=assess({"actionable_tasks":668,"source_policy":{
+        "cooldown_until":(now+timedelta(seconds=120)).isoformat(),"circuit_state":"closed"}},[],now=now)
+    assert metrics["source_cooldown_remaining_seconds"]==120
+    assert any("shared cooldown active" in alert for alert in alerts)

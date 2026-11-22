@@ -325,6 +325,7 @@ def main() -> None:
     # Optional at parse time so a failed scrape (which exports no cycle ID)
     # reports the pipeline failure instead of an argparse usage error.
     parser.add_argument("--discovery-cycle-id", default="")
+    parser.add_argument("--discovery-outcome", default="")
     args = parser.parse_args()
     results = {
         "scrape": args.scrape_result,
@@ -346,6 +347,7 @@ def main() -> None:
         )
     db = _get_db()
     state = query_publication_state(db)
+    state["discovery_outcome"] = args.discovery_outcome or "unreported"
     validate_publication_state(state, require_legacy_ready=False)
     diagnostic = query_publication_diagnostics(db, discovery_cycle_id)
     if pipeline_error:
@@ -371,6 +373,7 @@ def main() -> None:
         f"failed={state['failed']} processing={state['processing']} stale={state['stale']} "
         f"current_view_rows={state['published']} prior_classifications={state['prior_publication']} "
         f"scrape_watermark={state['scrape_watermark'] or 'unavailable'} "
+        f"discovery_outcome={state['discovery_outcome']} "
         f"outcome={state['outcome']} reason={state['reason'] or 'none'} "
         f"requested_cycle_id={state['requested_cycle_id']} "
         f"eligible_cycle_id={state['eligible_cycle_id'] or 'none'} "
